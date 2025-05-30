@@ -4,17 +4,16 @@ A high-performance communication library for distributed applications, primarily
 
 ## Overview
 
-zeroio is a lightweight, efficient library designed primarily for stdin/stdout communication between distributed applications through a centralized broker. It provides a unified protocol that can work across different transport layers while maintaining simplicity and performance. All clients connect to a central broker that handles message routing and delivery. When using stdin/stdout or TCP transports, the protocol can potentially support other programming languages beyond Rust.
+zeroio is a lightweight communication library for distributed applications. It uses a centralized broker architecture where all clients connect to handle message routing and delivery. The protocol is designed primarily for stdin/stdout communication but can work across different transport layers.
 
 ## Features
 
-- **Primary stdin/stdout Support**: Optimized for standard input/output communication
-- **Multiple Transport Layers**: Support for standard input/output, IPC, with TCP support planned
-- **Cross-Language Potential**: stdin/stdout and TCP transports can support other programming languages
-- **Efficient Serialization**: Uses MessagePack for fast and compact data serialization
-- **Message Types**: Request/Response, Notification, and Broadcast patterns
-- **Flexible Routing**: Route messages to specific clients or broadcast to all
-- **Network Byte Order**: Consistent cross-platform binary format
+- **stdin/stdout communication** (primary focus)
+- **Multiple transport layers**: IPC and TCP support planned
+- **MessagePack serialization** for efficient data encoding
+- **Four message types**: Request/Response, Notification, and Broadcast
+- **Centralized routing** through broker
+- **Cross-platform binary format** with network byte order
 
 ## Protocol
 
@@ -47,27 +46,7 @@ zeroio = "0.1"
 ### Basic Usage
 
 ```rust
-// Start a broker
-todo!()
-
-// Create a client and connect to broker
-todo!()
-
-// Send a request to a specific client
-todo!()
-
-// Send a notification to a specific client  
-todo!()
-
-// Broadcast a message (through broker)
-todo!()
-```
-
-### Message Routing
-
-Route messages to specific clients:
-
-```rust
+// API under development - examples coming soon
 todo!()
 ```
 
@@ -77,57 +56,36 @@ todo!()
 
 - **Standard I/O**: Direct stdin/stdout communication (main focus)
 
-### Additional Transports
+### Planned Transports
 
-- **IPC**: Unix domain sockets and named pipes
-- **TCP**: Network communication for distributed systems (planned)
-
-### Future Possibilities
-
+- **IPC**: [iceoryx2](https://github.com/eclipse-iceoryx/iceoryx2) for inter-process communication
+- **TCP**: Network communication for distributed systems
 - **WebSocket**: Browser and web application support
-- **Cross-language support**: Other programming languages via stdin/stdout and TCP
 
 ## Architecture
 
-zeroio is designed with a centralized broker architecture:
+**Centralized broker architecture** - all clients connect to a central broker for message routing:
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Client A  │    │   Client B  │    │   Client C  │
-├─────────────┤    ├─────────────┤    ├─────────────┤
-│ zeroio API  │    │ zeroio API  │    │ zeroio API  │
-└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
-       │                  │                  │
-       └──────────────────┼──────────────────┘
-                          │
-              ┌───────────▼───────────┐
-              │       Broker          │
-              ├───────────────────────┤
-              │    Message Router     │
-              ├───────────────────────┤
-              │      Protocol         │
-              ├───────────────────────┤
-              │     Transport         │
-              │   (stdin/IPC/TCP)     │
-              └───────────────────────┘
+Client A ──┐
+Client B ──┼── Broker ── Message Router ── Transport Layer
+Client C ──┘
 ```
 
 ## Performance
 
-- **Optimized for stdin/stdout** communication patterns
-- **MessagePack** for efficient serialization
-- **Async/await** support for non-blocking operations
-- **Minimal memory allocation** where possible
-- **Connection pooling** for high-throughput scenarios
+- Optimized for stdin/stdout communication
+- MessagePack serialization
+- Async/await support (planned)
+- Minimal memory allocation
 
 ## Use Cases
 
-- **Process Communication**: stdin/stdout based communication between applications
-- **Microservices**: Lightweight communication between local services via central broker
-- **Plugin Systems**: Communication between main application and plugins through message broker
-- **Data Processing Pipelines**: Efficient data flow between processing stages with centralized routing
-- **Development Tools**: Communication between development servers and tools via broker
-- **Cross-language Applications**: Connect applications written in different languages through unified broker
+- Process communication via stdin/stdout
+- Microservices coordination
+- Plugin systems
+- Data processing pipelines
+- Development tool integration
 
 ## Contributing
 
