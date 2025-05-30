@@ -15,6 +15,61 @@ serde = { version = "1.0", features = ["derive"] }
 rmp-serde = "1.3"
 thiserror = "2.0"
 
+[workspace.lints.clippy]
+# Performance lints - important for a communication library
+expect_used = "warn"
+unwrap_used = "warn"
+panic = "warn"
+clone_on_ref_ptr = "warn"
+rc_buffer = "warn"
+rc_mutex = "warn"
+
+# Memory and allocation
+box_collection = "warn"
+vec_init_then_push = "warn"
+large_stack_arrays = "warn"
+large_const_arrays = "warn"
+large_enum_variant = "warn"
+
+# API design
+must_use_candidate = "warn"
+return_self_not_must_use = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+missing_safety_doc = "warn"
+
+# Error handling
+result_large_err = "warn"
+redundant_clone = "warn"
+unnecessary_wraps = "warn"
+
+# Code quality
+cognitive_complexity = "warn"
+too_many_lines = "warn"
+similar_names = "warn"
+single_match_else = "warn"
+option_if_let_else = "warn"
+
+# Pedantic lints that make sense for a library
+explicit_iter_loop = "warn"
+manual_let_else = "warn"
+redundant_else = "warn"
+semicolon_if_nothing_returned = "warn"
+unreadable_literal = "warn"
+unused_self = "warn"
+
+# Network/serialization specific
+cast_lossless = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
+
+# Allow some lints that might be too noisy
+module_name_repetitions = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+
 [profile.dev]
 split-debuginfo = "unpacked"
 debug = "limited"

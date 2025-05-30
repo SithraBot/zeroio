@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
-use zeroio::decode::Message;
-use zeroio::encode::{MessageBuilder, Reqrep};
+use zeroio::{
+    decode::Message,
+    encode::{MessageBuilder, Reqrep},
+};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct TestData {
@@ -25,7 +27,7 @@ fn verify_roundtrip<T: Serialize + for<'a> Deserialize<'a> + PartialEq + std::fm
     assert_eq!(message.version(), 1);
     assert_eq!(message.client_id(), expected_client);
     assert_eq!(message.message_type(), expected_type);
-    
+
     let decoded: T = message.payload().unwrap();
     assert_eq!(&decoded, expected_payload);
 }
@@ -33,44 +35,68 @@ fn verify_roundtrip<T: Serialize + for<'a> Deserialize<'a> + PartialEq + std::fm
 #[test]
 fn test_message_types() {
     let data = test_data();
-    
+
     // Broadcast
     let broadcast = MessageBuilder::simple_broadcast(1001, &data).unwrap();
-    verify_roundtrip(&broadcast, &data, 1001, zeroio::decode::MessageType::Broadcast);
-    
+    verify_roundtrip(
+        &broadcast,
+        &data,
+        1001,
+        zeroio::decode::MessageType::Broadcast,
+    );
+
     let msg = Message::from_buffer(&broadcast).unwrap();
     let header = msg.header().unwrap();
     assert!(header.routing.is_none());
     assert!(header.reqrep.is_none());
-    
+
     // Request
     let request = MessageBuilder::simple_request(
-        2001, 3001, "/api".to_string(), "req_123".to_string(), &data
-    ).unwrap();
+        2001,
+        3001,
+        "/api".to_string(),
+        "req_123".to_string(),
+        &data,
+    )
+    .unwrap();
     verify_roundtrip(&request, &data, 2001, zeroio::decode::MessageType::Request);
-    
+
     let msg = Message::from_buffer(&request).unwrap();
     let header = msg.header().unwrap();
     assert!(header.routing.is_some());
     assert!(matches!(header.reqrep, Some(Reqrep::Request(_))));
-    
+
     // Response
     let response = MessageBuilder::simple_response(
-        3001, 2001, "/api".to_string(), "req_123".to_string(), &data
-    ).unwrap();
-    verify_roundtrip(&response, &data, 3001, zeroio::decode::MessageType::Response);
-    
+        3001,
+        2001,
+        "/api".to_string(),
+        "req_123".to_string(),
+        &data,
+    )
+    .unwrap();
+    verify_roundtrip(
+        &response,
+        &data,
+        3001,
+        zeroio::decode::MessageType::Response,
+    );
+
     let msg = Message::from_buffer(&response).unwrap();
     let header = msg.header().unwrap();
     assert!(header.routing.is_some());
     assert!(matches!(header.reqrep, Some(Reqrep::Correlation(_))));
-    
+
     // Notification
-    let notification = MessageBuilder::simple_notification(
-        4001, 5001, "/events".to_string(), &data
-    ).unwrap();
-    verify_roundtrip(&notification, &data, 4001, zeroio::decode::MessageType::Notification);
-    
+    let notification =
+        MessageBuilder::simple_notification(4001, 5001, "/events".to_string(), &data).unwrap();
+    verify_roundtrip(
+        &notification,
+        &data,
+        4001,
+        zeroio::decode::MessageType::Notification,
+    );
+
     let msg = Message::from_buffer(&notification).unwrap();
     let header = msg.header().unwrap();
     assert!(header.routing.is_some());
@@ -80,7 +106,7 @@ fn test_message_types() {
 #[test]
 fn test_multiple_routing() {
     let data = test_data();
-    
+
     let encoded = MessageBuilder::notification(6001)
         .with_route(7001, "/path1".to_string())
         .with_route(7002, "/path2".to_string())
@@ -89,9 +115,14 @@ fn test_multiple_routing() {
         .unwrap()
         .build()
         .unwrap();
-    
-    verify_roundtrip(&encoded, &data, 6001, zeroio::decode::MessageType::Notification);
-    
+
+    verify_roundtrip(
+        &encoded,
+        &data,
+        6001,
+        zeroio::decode::MessageType::Notification,
+    );
+
     let msg = Message::from_buffer(&encoded).unwrap();
     let header = msg.header().unwrap();
     let routing = header.routing.unwrap();
@@ -109,25 +140,30 @@ fn test_edge_cases() {
     // Empty payload
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Empty;
-    
+
     let empty = MessageBuilder::simple_broadcast(8001, &Empty).unwrap();
     verify_roundtrip(&empty, &Empty, 8001, zeroio::decode::MessageType::Broadcast);
-    
+
     // Large payload
     let large_data = TestData {
         msg: "x".repeat(5000),
         num: 999,
     };
     let large = MessageBuilder::simple_broadcast(8002, &large_data).unwrap();
-    verify_roundtrip(&large, &large_data, 8002, zeroio::decode::MessageType::Broadcast);
-    
+    verify_roundtrip(
+        &large,
+        &large_data,
+        8002,
+        zeroio::decode::MessageType::Broadcast,
+    );
+
     // Raw binary
     let binary = vec![0xDE, 0xAD, 0xBE, 0xEF];
     let raw = MessageBuilder::broadcast(8003)
         .with_raw_payload(binary.clone())
         .build()
         .unwrap();
-    
+
     let msg = Message::from_buffer(&raw).unwrap();
     assert_eq!(msg.payload_bytes(), &binary);
 }

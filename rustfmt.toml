@@ -1,0 +1,67 @@
+# Rust formatting configuration for zeroio project
+
+# Edition and basic settings
+edition = "2021"
+hard_tabs = false
+tab_spaces = 4
+
+# Line length and wrapping
+max_width = 100
+comment_width = 80
+wrap_comments = true
+
+# Imports
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+
+# Function and method formatting
+fn_single_line = false
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+
+# Struct and enum formatting
+struct_lit_single_line = true
+enum_discrim_align_threshold = 20
+struct_field_align_threshold = 20
+
+# Array and slice formatting
+array_width = 80
+chain_width = 80
+
+# Documentation and comments
+doc_comment_code_block_width = 80
+format_code_in_doc_comments = true
+normalize_doc_attributes = true
+
+# String formatting
+format_strings = true
+
+# Trailing elements
+trailing_comma = "Vertical"
+trailing_semicolon = true
+
+# Space and newline preferences
+space_before_colon = false
+space_after_colon = true
+spaces_around_ranges = false
+newline_style = "Unix"
+
+# Match formatting
+match_block_trailing_comma = false
+match_arm_blocks = true
+match_arm_leading_pipes = "Never"
+
+# Type formatting
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Misc formatting
+remove_nested_parens = true
+reorder_impl_items = true
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Error handling
+error_on_line_overflow = false
+error_on_unformatted = false

@@ -24,15 +24,15 @@ pub enum MessageEncodeError {
 /// Protocol V1 Message Builder
 pub struct MessageBuilder {
     /// Protocol version (always 1)
-    version: u8,
+    version:   u8,
     /// Message type
-    msg_type: MessageType,
+    msg_type:  MessageType,
     /// Client identifier
     client_id: u32,
     /// Header data
-    header: Header,
+    header:    Header,
     /// Payload data (pre-serialized)
-    payload: Vec<u8>,
+    payload:   Vec<u8>,
 }
 
 // Protocol V1 constants
@@ -43,6 +43,7 @@ const PAYLOAD_LEN_SIZE: usize = 8;
 
 impl MessageBuilder {
     /// Create a new message builder
+    #[must_use]
     pub fn new(msg_type: MessageType, client_id: u32) -> Self {
         Self {
             version: PROTOCOL_VERSION,
@@ -50,13 +51,14 @@ impl MessageBuilder {
             client_id,
             header: Header {
                 routing: None,
-                reqrep: None,
+                reqrep:  None,
             },
             payload: Vec::new(),
         }
     }
 
     /// Create a request message
+    #[must_use]
     pub fn request(client_id: u32, request_id: String) -> Self {
         let mut builder = Self::new(MessageType::Request, client_id);
         builder.header.reqrep = Some(Reqrep::Request(request_id));
@@ -64,6 +66,7 @@ impl MessageBuilder {
     }
 
     /// Create a response message
+    #[must_use]
     pub fn response(client_id: u32, correlation_id: String) -> Self {
         let mut builder = Self::new(MessageType::Response, client_id);
         builder.header.reqrep = Some(Reqrep::Correlation(correlation_id));
@@ -71,22 +74,26 @@ impl MessageBuilder {
     }
 
     /// Create a notification message
+    #[must_use]
     pub fn notification(client_id: u32) -> Self {
         Self::new(MessageType::Notification, client_id)
     }
 
     /// Create a broadcast message
+    #[must_use]
     pub fn broadcast(client_id: u32) -> Self {
         Self::new(MessageType::Broadcast, client_id)
     }
 
     /// Add routing information
+    #[must_use]
     pub fn with_routing(mut self, routing: Vec<Routing>) -> Self {
         self.header.routing = Some(routing);
         self
     }
 
     /// Add single route
+    #[must_use]
     pub fn with_route(mut self, client_id: u32, path: String) -> Self {
         let routing = match self.header.routing.take() {
             Some(mut routes) => {
@@ -100,13 +107,18 @@ impl MessageBuilder {
     }
 
     /// Set payload from serializable data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload cannot be serialized
     pub fn with_payload<T: Serialize>(mut self, payload: &T) -> Result<Self, MessageEncodeError> {
-        self.payload = rmp_serde::to_vec(payload)
-            .map_err(|_| MessageEncodeError::PayloadSerializeError)?;
+        self.payload =
+            rmp_serde::to_vec(payload).map_err(|_| MessageEncodeError::PayloadSerializeError)?;
         Ok(self)
     }
 
     /// Set payload from raw bytes
+    #[must_use]
     pub fn with_raw_payload(mut self, payload: Vec<u8>) -> Self {
         self.payload = payload;
         self
@@ -143,6 +155,10 @@ impl MessageBuilder {
     }
 
     /// Calculate the total size needed for the encoded message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message is too large or has invalid structure
     pub fn calculate_size(&self) -> Result<usize, MessageEncodeError> {
         // Serialize header to get its size
         let header_bytes = rmp_serde::to_vec(&self.header)?;
@@ -153,7 +169,7 @@ impl MessageBuilder {
         if header_len > u32::MAX as usize {
             return Err(MessageEncodeError::MessageTooLarge);
         }
-        if payload_len > u64::MAX as usize {
+        if payload_len > usize::try_from(u64::MAX).unwrap_or(usize::MAX) {
             return Err(MessageEncodeError::MessageTooLarge);
         }
 
@@ -161,6 +177,10 @@ impl MessageBuilder {
     }
 
     /// Build the message into a BytesMut buffer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails or the message is too large
     pub fn build(self) -> Result<BytesMut, MessageEncodeError> {
         // Validate before building
         self.validate()?;
@@ -174,7 +194,7 @@ impl MessageBuilder {
         if header_len > u32::MAX as usize {
             return Err(MessageEncodeError::MessageTooLarge);
         }
-        if payload_len > u64::MAX as usize {
+        if payload_len > usize::try_from(u64::MAX).unwrap_or(usize::MAX) {
             return Err(MessageEncodeError::MessageTooLarge);
         }
 
@@ -183,28 +203,36 @@ impl MessageBuilder {
         let mut buffer = BytesMut::with_capacity(total_size);
 
         // Write base header
-        buffer.put_u8(self.version);                    // Version
-        buffer.put_u8(self.msg_type as u8);            // Type
-        buffer.put_u32(self.client_id);                // ClientID
-        buffer.put_bytes(0, RESERVED_SIZE);            // Reserved (16 zero bytes)
-        buffer.put_u32(header_len as u32);             // HeaderLength
+        buffer.put_u8(self.version); // Version
+        buffer.put_u8(self.msg_type as u8); // Type
+        buffer.put_u32(self.client_id); // ClientID
+        buffer.put_bytes(0, RESERVED_SIZE); // Reserved (16 zero bytes)
+        buffer.put_u32(u32::try_from(header_len).map_err(|_| MessageEncodeError::MessageTooLarge)?); // HeaderLength
 
         // Write variable header
         buffer.put_slice(&header_bytes);
 
         // Write payload length and payload
-        buffer.put_u64(payload_len as u64);            // PayloadLength
-        buffer.put_slice(&self.payload);               // Payload
+        buffer.put_u64(payload_len as u64); // PayloadLength
+        buffer.put_slice(&self.payload); // Payload
 
         Ok(buffer)
     }
 
     /// Build the message into a Vec<u8>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails or the message is too large
     pub fn build_vec(self) -> Result<Vec<u8>, MessageEncodeError> {
         Ok(self.build()?.to_vec())
     }
 
     /// Build the message and write it to an existing buffer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails or the message is too large
     pub fn build_into(self, buffer: &mut BytesMut) -> Result<(), MessageEncodeError> {
         let message_bytes = self.build()?;
         buffer.extend_from_slice(&message_bytes);
@@ -215,6 +243,11 @@ impl MessageBuilder {
 /// Convenience functions for quick message creation
 impl MessageBuilder {
     /// Create a simple request with routing to a single endpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload cannot be serialized or the message is
+    /// invalid
     pub fn simple_request(
         client_id: u32,
         target_client: u32,
@@ -229,6 +262,11 @@ impl MessageBuilder {
     }
 
     /// Create a simple response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload cannot be serialized or the message is
+    /// invalid
     pub fn simple_response(
         client_id: u32,
         target_client: u32,
@@ -243,6 +281,11 @@ impl MessageBuilder {
     }
 
     /// Create a simple notification
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload cannot be serialized or the message is
+    /// invalid
     pub fn simple_notification(
         client_id: u32,
         target_client: u32,
@@ -256,32 +299,36 @@ impl MessageBuilder {
     }
 
     /// Create a simple broadcast
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload cannot be serialized or the message is
+    /// invalid
     pub fn simple_broadcast(
         client_id: u32,
         payload: &impl Serialize,
     ) -> Result<BytesMut, MessageEncodeError> {
-        Self::broadcast(client_id)
-            .with_payload(payload)?
-            .build()
+        Self::broadcast(client_id).with_payload(payload)?.build()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde::{Deserialize, Serialize};
+
+    use super::*;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct TestPayload {
         message: String,
-        value: i32,
+        value:   i32,
     }
 
     #[test]
     fn test_broadcast_message() {
         let payload = TestPayload {
             message: "Hello World".to_string(),
-            value: 42,
+            value:   42,
         };
 
         let result = MessageBuilder::simple_broadcast(1234, &payload);
@@ -295,7 +342,7 @@ mod tests {
     fn test_request_message() {
         let payload = TestPayload {
             message: "Request data".to_string(),
-            value: 100,
+            value:   100,
         };
 
         let result = MessageBuilder::simple_request(
@@ -314,8 +361,11 @@ mod tests {
             .with_route(5678, "/invalid".to_string())
             .with_raw_payload(vec![1, 2, 3])
             .build();
-        
-        assert!(matches!(result, Err(MessageEncodeError::InvalidRoutingData)));
+
+        assert!(matches!(
+            result,
+            Err(MessageEncodeError::InvalidRoutingData)
+        ));
     }
 
     #[test]
@@ -324,7 +374,7 @@ mod tests {
             .with_route(5678, "/test".to_string())
             .with_raw_payload(vec![1, 2, 3])
             .build();
-        
+
         assert!(matches!(result, Err(MessageEncodeError::MissingHeaderData)));
     }
 }

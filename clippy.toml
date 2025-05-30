@@ -1,0 +1,41 @@
+# Clippy configuration for zeroio project
+
+# Complexity thresholds
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 120
+type-complexity-threshold = 250
+
+# Size thresholds
+enum-variant-size-threshold = 200
+large-error-threshold = 128
+trivial-copy-size-limit = 128
+pass-by-value-size-limit = 256
+vec-box-size-threshold = 4096
+array-size-threshold = 512000
+
+# Performance thresholds
+future-size-threshold = 16384
+stack-size-threshold = 512000
+
+# Code style
+single-char-binding-names-threshold = 4
+max-struct-bools = 3
+max-fn-params-bools = 3
+literal-representation-threshold = 10
+
+# Documentation
+missing-docs-in-crate-items = true
+
+# Allow certain practices in tests
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true
+
+# MSRV for compatibility
+msrv = "1.70.0"
+
+# Avoid breaking changes
+avoid-breaking-exported-api = true
