@@ -567,48 +567,6 @@ pub mod utils {
 
         buffer.len() >= payload_len_offset + 8 + payload_len
     }
-
-    /// Create a borrowed message pool for high-throughput scenarios
-    pub struct MessagePool<'a> {
-        buffers: smallvec::SmallVec<[&'a [u8]; 32]>,
-        current: usize,
-    }
-
-    impl<'a> Default for MessagePool<'a> {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<'a> MessagePool<'a> {
-        #[must_use]
-        pub fn new() -> Self {
-            Self {
-                buffers: smallvec::SmallVec::new(),
-                current: 0,
-            }
-        }
-
-        pub fn add_buffer(&mut self, buffer: &'a [u8]) {
-            self.buffers.push(buffer);
-        }
-
-        pub fn next_message(
-            &mut self,
-        ) -> Option<Result<BorrowedMessage<'a>, MessageDeserializeError>> {
-            if self.current >= self.buffers.len() {
-                return None;
-            }
-
-            let buffer = self.buffers[self.current];
-            self.current += 1;
-            Some(BorrowedMessage::from_buffer(buffer))
-        }
-
-        pub fn reset(&mut self) {
-            self.current = 0;
-        }
-    }
 }
 
 #[cfg(test)]

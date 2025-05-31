@@ -148,7 +148,7 @@ impl BufferPool {
     }
 }
 
-/// Memory-aligned buffer with zero-copy capabilities
+/// memory-aligned buffer with zero-copy capabilities
 pub struct AlignedBuffer {
     ptr:      NonNull<u8>,
     capacity: usize,
