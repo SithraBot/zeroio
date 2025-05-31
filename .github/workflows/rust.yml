@@ -1,0 +1,26 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "v1" ]
+  pull_request:
+    branches: [ "v1" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run check
+      run: cargo check --workspace
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Run clippy
+      run: cargo clippy --workspace
+    - name: Run fmt check
+      run: cargo fmt --check
