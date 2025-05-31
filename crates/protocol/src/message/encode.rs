@@ -1,3 +1,5 @@
+use once_cell::sync::OnceCell;
+
 // Re-export core types for backward compatibility
 pub use crate::message::types::{
     Auth, Header, Keepalive, MessageDeserializeError, MessageEncodeError, MessageType, Reqrep,
@@ -8,11 +10,12 @@ use crate::message::{traits::*, types::*};
 /// Builder for constructing protocol messages
 #[derive(Debug, Clone)]
 pub struct MessageBuilder {
-    version:   u8,
-    msg_type:  MessageType,
-    client_id: u32,
-    header:    Header,
-    payload:   Vec<u8>,
+    version:     u8,
+    msg_type:    MessageType,
+    client_id:   u32,
+    header:      Header,
+    header_data: OnceCell<Vec<u8>>,
+    payload:     Vec<u8>,
 }
 
 const PROTOCOL_VERSION: u8 = 1;
@@ -20,6 +23,16 @@ const RESERVED_SIZE: usize = 16;
 const BASE_HEADER_SIZE: usize = 34;
 
 impl MessageBuilder {
+    fn get_header_data(&self) -> Result<&Vec<u8>, MessageEncodeError> {
+        self.header_data.get_or_try_init(|| {
+            if self.is_header_empty() {
+                return Ok(Vec::new());
+            }
+            rmp_serde::to_vec(&self.header)
+                .map_err(|e| MessageEncodeError::HeaderSerializeError(e.to_string()))
+        })
+    }
+
     /// Create a new message builder with the specified type and client ID
     #[must_use]
     pub fn new(msg_type: MessageType, client_id: u32) -> Self {
@@ -28,6 +41,7 @@ impl MessageBuilder {
             msg_type,
             client_id,
             header: Header::default(),
+            header_data: OnceCell::new(),
             payload: Vec::new(),
         }
     }
@@ -203,8 +217,7 @@ impl MessageBuilder {
 
 impl MessageEncode for MessageBuilder {
     fn calculate_size(&self) -> Result<usize, MessageEncodeError> {
-        let header_data = rmp_serde::to_vec(&self.header)
-            .map_err(|e| MessageEncodeError::HeaderSerializeError(e.to_string()))?;
+        let header_data = self.get_header_data()?;
 
         let total_size = BASE_HEADER_SIZE + header_data.len() + self.payload.len();
 
@@ -220,12 +233,7 @@ impl MessageEncode for MessageBuilder {
         self.validate()?;
 
         // Handle empty headers specially
-        let header_data = if self.is_header_empty() {
-            Vec::new()
-        } else {
-            rmp_serde::to_vec(&self.header)
-                .map_err(|e| MessageEncodeError::HeaderSerializeError(e.to_string()))?
-        };
+        let header_data = self.get_header_data()?;
 
         let total_size = BASE_HEADER_SIZE + header_data.len() + self.payload.len();
 
@@ -258,7 +266,7 @@ impl MessageEncode for MessageBuilder {
         offset += 4;
 
         // Header data
-        buffer[offset..offset + header_data.len()].copy_from_slice(&header_data);
+        buffer[offset..offset + header_data.len()].copy_from_slice(header_data);
         offset += header_data.len();
 
         // Payload length (8 bytes, big-endian)

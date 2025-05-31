@@ -86,9 +86,9 @@ impl<'a> MessageDecode<'a> for Message<'a> {
         let payload_offset = payload_len_offset + PAYLOAD_LEN_SIZE;
         let total_expected_len = payload_offset
             + usize::try_from(payload_len).map_err(|_| {
-                MessageDeserializeError::InvalidHeaderData(
-                    "Payload length too large for this platform".to_string(),
-                )
+                MessageDeserializeError::InvalidHeaderData(format!(
+                    "Payload length {payload_len} too large for this platform"
+                ))
             })?;
 
         if buffer.len() < total_expected_len {

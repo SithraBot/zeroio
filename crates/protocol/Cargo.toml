@@ -17,6 +17,7 @@ serde.workspace = true
 rmp-serde.workspace = true
 bytes.workspace = true
 thiserror.workspace = true
+once_cell.workspace = true
 
 # Zero-copy optimizations
 zerocopy = { version = "0.7", features = ["derive"] }
