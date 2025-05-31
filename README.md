@@ -1,15 +1,9 @@
 # zeroio
 
-A high-performance, ZeroMQ-inspired communication library for distributed applications with a focus on zero-copy message processing and pluggable transport layers.
-
-## Overview
-
 zeroio is a modern, high-performance communication library designed for distributed applications. It implements a custom binary protocol with centralized broker architecture, optimized for maximum throughput and minimal memory allocation. The library follows Rust's ownership principles while providing ZeroMQ-like communication patterns.
 
-**🚀 Key Features:**
+## Features
 
-- **High Performance**: Zero-copy message parsing, optimized data structures (DashMap, atomic counters)
-- **Type Safety**: Comprehensive error handling with detailed validation
 - **Clean Architecture**: Layered design separating protocol, core, and API concerns
 - **Transport Agnostic**: Pluggable transport layer supporting TCP, IPC, WebSocket, and STDIO
 - **Middleware System**: Extensible processing pipeline with built-in auth, logging, metrics, and rate limiting
@@ -17,9 +11,6 @@ zeroio is a modern, high-performance communication library designed for distribu
 - **Memory Efficient**: Buffer pools, zero-copy parsing, minimal allocations, bounded message sizes
 - **High-Performance Routing**: LRU caching, DashMap-based client registry, atomic metrics
 - **Connection Management**: Automatic client ID assignment, connection pooling, idle cleanup
-
-## Features
-
 - **Multiple Transport Layers**: STDIO (primary), TCP, IPC, WebSocket support
 - **MessagePack Serialization** for efficient structured data encoding
 - **Eight Message Types**: Join, Request/Response, Notification, Broadcast, Topic Publish, Subscribe/Unsubscribe
@@ -34,14 +25,6 @@ zeroio is a modern, high-performance communication library designed for distribu
 ## Protocol
 
 See [draft.md](draft.md) for complete protocol specification.
-
-### Quick Start
-
-### Basic Message Creation and Parsing
-
-### Request/Response Pattern
-
-### Topic Publish/Subscribe
 
 ## Contributing
 
