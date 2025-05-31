@@ -21,7 +21,7 @@ We welcome all contributions to make this project better.
 git clone https://github.com/SithraBot/zeroio.git
 cd zeroio
 cargo build
-cargo test
+cargo test --workspace
 ```
 
 ### Making Changes
@@ -29,7 +29,7 @@ cargo test
 ```bash
 git checkout -b feature/your-feature-name
 # Make changes, add tests, update docs
-cargo test
+cargo test --workspace
 cargo clippy --workspace
 cargo fmt --check
 ```

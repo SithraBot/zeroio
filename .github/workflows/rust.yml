@@ -19,7 +19,7 @@ jobs:
     - name: Run check
       run: cargo check --workspace
     - name: Run tests
-      run: cargo test
+      run: cargo test --workspace
     - name: Run clippy
       run: cargo clippy --workspace
     - name: Run fmt check
