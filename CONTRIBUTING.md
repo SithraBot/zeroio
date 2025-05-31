@@ -47,6 +47,7 @@ cargo fmt --check
 The project uses custom clippy and rustfmt configurations for consistency.
 
 ### Protocol Changes
+
 - Maintain backward compatibility
 - Update `draft.md` specification
 - Consider cross-language implications
@@ -65,13 +66,17 @@ The project uses custom clippy and rustfmt configurations for consistency.
 ## Reporting Issues
 
 ### Bug Reports
+
 Include:
+
 - OS and Rust version (`rustc --version`)
 - Steps to reproduce
 - Expected vs actual behavior
 
 ### Feature Requests
+
 Describe:
+
 - Use case and how it works
 - Alternatives considered
 - Whether you'll implement it

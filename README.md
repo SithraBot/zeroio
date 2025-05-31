@@ -1,110 +1,62 @@
 # zeroio
 
-A high-performance communication library for distributed applications, primarily designed for stdin/stdout communication in Rust.
+A high-performance, ZeroMQ-inspired communication library for distributed applications with a focus on zero-copy message processing and pluggable transport layers.
 
 ## Overview
 
-zeroio is a lightweight communication library for distributed applications. It uses a centralized broker architecture where all clients connect to handle message routing and delivery. The protocol is designed primarily for stdin/stdout communication but can work across different transport layers.
+zeroio is a modern, high-performance communication library designed for distributed applications. It implements a custom binary protocol with centralized broker architecture, optimized for maximum throughput and minimal memory allocation. The library follows Rust's ownership principles while providing ZeroMQ-like communication patterns.
+
+**🚀 Key Features:**
+
+- **High Performance**: Zero-copy message parsing, optimized data structures (DashMap, atomic counters)
+- **Type Safety**: Comprehensive error handling with detailed validation
+- **Clean Architecture**: Layered design separating protocol, core, and API concerns
+- **Transport Agnostic**: Pluggable transport layer supporting TCP, IPC, WebSocket, and STDIO
+- **Middleware System**: Extensible processing pipeline with built-in auth, logging, metrics, and rate limiting
+- **Async-First Design**: Full tokio integration with proper cancellation support
+- **Memory Efficient**: Buffer pools, zero-copy parsing, minimal allocations, bounded message sizes
+- **High-Performance Routing**: LRU caching, DashMap-based client registry, atomic metrics
+- **Connection Management**: Automatic client ID assignment, connection pooling, idle cleanup
 
 ## Features
 
-- **stdin/stdout communication** (primary focus)
-- **Multiple transport layers**: IPC and TCP support planned
-- **MessagePack serialization** for efficient data encoding
-- **Four message types**: Request/Response, Notification, and Broadcast
-- **Centralized routing** through broker
-- **Cross-platform binary format** with network byte order
+- **Multiple Transport Layers**: STDIO (primary), TCP, IPC, WebSocket support
+- **MessagePack Serialization** for efficient structured data encoding
+- **Eight Message Types**: Join, Request/Response, Notification, Broadcast, Topic Publish, Subscribe/Unsubscribe
+- **Centralized Broker Architecture** with high-performance message routing
+- **Cross-Platform Binary Protocol** with network byte order encoding
+- **ULID Correlation IDs** for efficient request tracking
+- **Concurrent Data Structures** for maximum throughput
+- **Built-in Performance Monitoring** with atomic metrics
+- **Configurable Limits** and timeouts for production deployments
+- **Authentication Support** with pluggable auth mechanisms
 
 ## Protocol
 
-zeroio implements a custom binary protocol with the following message types:
+See [draft.md](draft.md) for complete protocol specification.
 
-- **Request (0)**: Send a request and expect a response
-- **Response (1)**: Reply to a request with correlation ID
-- **Notification (2)**: One-way message without response
-- **Broadcast (3)**: Message sent to all connected clients
+### Quick Start
 
-## Message Format
+### Basic Message Creation and Parsing
 
-```
-┌─────────────┬──────────────┬─────────────┬─────────────┬───────────────┬────────────┬─────────────────┬─────────────┐
-│ Version (1) │ Type (1)     │ ClientID(4) │ Reserved(16)│ HeaderLen (4) │ Header (?) │ PayloadLen (8)  │ Payload (?) │
-└─────────────┴──────────────┴─────────────┴─────────────┴───────────────┴────────────┴─────────────────┴─────────────┘
-```
+### Request/Response Pattern
 
-All numeric values are encoded in network byte order (big-endian).
-
-## Quick Start
-
-Add zeroio to your `Cargo.toml`:
-
-```toml
-[dependencies]
-zeroio = "0.1"
-```
-
-### Basic Usage
-
-```rust
-// API under development - examples coming soon
-todo!()
-```
-
-## Transport Support
-
-### Primary Transport
-
-- **Standard I/O**: Direct stdin/stdout communication (main focus)
-
-### Planned Transports
-
-- **IPC**: [iceoryx2](https://github.com/eclipse-iceoryx/iceoryx2) for inter-process communication
-- **TCP**: Network communication for distributed systems
-- **WebSocket**: Browser and web application support
-
-## Architecture
-
-**Centralized broker architecture** - all clients connect to a central broker for message routing:
-
-```
-Client A ──┐
-Client B ──┼── Broker ── Message Router ── Transport Layer
-Client C ──┘
-```
-
-## Performance
-
-- Optimized for stdin/stdout communication
-- MessagePack serialization
-- Async/await support (planned)
-- Minimal memory allocation
-
-## Use Cases
-
-- Process communication via stdin/stdout
-- Microservices coordination
-- Plugin systems
-- Data processing pipelines
-- Development tool integration
+### Topic Publish/Subscribe
 
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+### Development Setup
+
+```bash
+git clone https://github.com/your-org/zeroio.git
+cd zeroio
+cargo test --all-features
+cargo test --package zeroio --lib protocol::tests
+cargo test --package zeroio --lib router::tests
+```
+
 ## License
 
 This project is licensed under the Unlicense - see the [LICENSE](LICENSE) file for details.
-
-## Status
-
-🚧 **Early Development** - API may change before 1.0 release
-
-Current focus areas:
-- [x] Core protocol implementation
-- [ ] Standard I/O transport (primary focus)
-- [ ] IPC transport layer
-- [ ] TCP transport layer
-- [ ] Async runtime integration
-- [ ] Cross-language binding support
-- [ ] Performance optimization
-- [ ] Documentation and examples
