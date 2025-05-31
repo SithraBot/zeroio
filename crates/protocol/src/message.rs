@@ -1,7 +1,6 @@
 pub mod buffer;
 pub mod decode;
 pub mod encode;
-pub mod optimized;
 pub mod traits;
 pub mod types;
 pub mod zerocopy;
@@ -13,7 +12,6 @@ pub use buffer::{
     RingBuffer,
 };
 // Re-export optimized processing types
-pub use optimized::{DecoderMetrics, MessageClassifier, OptimizedDecoder, OptimizedRouter};
 pub use traits::{
     HeaderAccess, Message, MessageDecode, MessageEncode, MessageValidate, OwnedMessage,
     PayloadAccess,
