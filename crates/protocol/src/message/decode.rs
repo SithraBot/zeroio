@@ -178,6 +178,31 @@ impl<'a> MessageDecode<'a> for Message<'a> {
 }
 
 impl<'a> Message<'a> {
+    /// Convert to owned message
+    ///
+    /// # Errors
+    ///
+    /// Returns `MessageEncodeError` if:
+    /// - Header deserialization fails
+    /// - Message payload is invalid or corrupted
+    /// - Required message fields are missing
+    pub fn to_owned(
+        &self,
+    ) -> Result<crate::message::traits::OwnedMessage, crate::message::types::MessageEncodeError>
+    {
+        let header = self.header().map_err(|e| {
+            crate::message::types::MessageEncodeError::HeaderSerializeError(e.to_string())
+        })?;
+
+        Ok(crate::message::traits::OwnedMessage {
+            version: self.version,
+            msg_type: self.msg_type,
+            client_id: self.client_id,
+            header,
+            payload: self.payload_bytes().to_vec(),
+        })
+    }
+
     fn validate_header(&self) -> Result<(), MessageDeserializeError> {
         let header = self.header()?;
 
@@ -401,14 +426,14 @@ mod tests {
         // Create header with keepalive
         let header = Header {
             keepalive: Some(Keepalive {
-                timestamp: 1703123456789,
+                timestamp: 1_703_123_456_789,
                 interval:  Some(30),
             }),
             ..Default::default()
         };
 
         let header_data = rmp_serde::to_vec(&header).unwrap();
-        let header_len = header_data.len() as u32;
+        let header_len = u32::try_from(header_data.len()).unwrap_or(u32::MAX);
 
         // Header length
         buffer[offset..offset + 4].copy_from_slice(&header_len.to_be_bytes());
@@ -467,7 +492,7 @@ mod tests {
         let header = message.header().unwrap();
         assert!(header.keepalive.is_some());
         let keepalive = header.keepalive.unwrap();
-        assert_eq!(keepalive.timestamp, 1703123456789);
+        assert_eq!(keepalive.timestamp, 1_703_123_456_789);
         assert_eq!(keepalive.interval, Some(30));
     }
 

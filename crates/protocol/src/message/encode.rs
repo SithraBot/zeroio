@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_ping_pong_messages() {
-        let timestamp = 1703123456789u64;
+        let timestamp = 1_703_123_456_789u64;
 
         // Test PING
         let ping_builder = MessageBuilder::ping_with_interval(1234, timestamp, 30);
@@ -660,18 +660,18 @@ mod tests {
         assert_eq!(keepalive.interval, Some(30));
 
         // Test PONG
-        let pong_builder = MessageBuilder::pong(5678, timestamp);
-        let pong_buffer = pong_builder.build_vec().unwrap();
+        let response_builder = MessageBuilder::pong(5678, timestamp);
+        let response_buffer = response_builder.build_vec().unwrap();
 
-        let pong_message = Message::from_buffer(&pong_buffer).unwrap();
-        assert_eq!(pong_message.message_type(), MessageType::Pong);
-        assert_eq!(pong_message.client_id(), 5678);
+        let response_message = Message::from_buffer(&response_buffer).unwrap();
+        assert_eq!(response_message.message_type(), MessageType::Pong);
+        assert_eq!(response_message.client_id(), 5678);
 
-        let pong_header = pong_message.header().unwrap();
-        assert!(pong_header.keepalive.is_some());
-        let pong_keepalive = pong_header.keepalive.unwrap();
-        assert_eq!(pong_keepalive.timestamp, timestamp);
-        assert_eq!(pong_keepalive.interval, None);
+        let response_header = response_message.header().unwrap();
+        assert!(response_header.keepalive.is_some());
+        let response_keepalive = response_header.keepalive.unwrap();
+        assert_eq!(response_keepalive.timestamp, timestamp);
+        assert_eq!(response_keepalive.interval, None);
     }
 
     #[test]
@@ -713,11 +713,11 @@ mod tests {
 
     #[test]
     fn test_invalid_pong_with_interval() {
-        let builder = MessageBuilder::ping_with_interval(1234, 1703123456789, 30);
+        let builder = MessageBuilder::ping_with_interval(1234, 1_703_123_456_789, 30);
 
         // Change type to PONG but keep interval - should fail validation
         let mut pong_builder = MessageBuilder::new(MessageType::Pong, 1234);
-        pong_builder.header = builder.header.clone();
+        pong_builder.header = builder.header;
 
         let result = pong_builder.build_vec();
         assert!(matches!(

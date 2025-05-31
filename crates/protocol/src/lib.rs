@@ -6,6 +6,28 @@ pub mod core;
 
 // Re-export core types and traits
 // Re-export specific implementations
+// Re-export zero-copy types for high-performance scenarios
+pub use message::{
+    // Buffer management types
+    AlignedBuffer,
+    BorrowedMessage,
+    BufferError,
+    BufferManager,
+    BufferMetrics,
+    // Optimized processing types
+    DecoderMetrics,
+    HeaderField,
+    MappedBuffer,
+    MessageAssembler,
+    MessageClassifier,
+    MessageMetadata,
+    OptimizedDecoder,
+    OptimizedRouter,
+    RingBuffer,
+    StreamingEncoder,
+    ZeroCopyDecode,
+    ZeroCopyEncode,
+};
 pub use message::{
     Auth,
     CLIENT_ID_BROKER,
