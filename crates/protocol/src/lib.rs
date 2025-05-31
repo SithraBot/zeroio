@@ -6,8 +6,6 @@ pub mod core;
 
 // Re-export core types and traits
 // Re-export specific implementations
-pub use message::decode::Message;
-pub use message::encode::MessageBuilder;
 pub use message::{
     Auth,
     CLIENT_ID_BROKER,
@@ -33,6 +31,7 @@ pub use message::{
     Routing,
     StatusCode,
 };
+pub use message::{decode::Message, encode::MessageBuilder};
 
 // Protocol version
 pub const PROTOCOL_VERSION: u8 = 1;

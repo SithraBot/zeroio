@@ -144,10 +144,11 @@ impl MessageBuilder {
     }
 
     /// Set the payload from a serializable object
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError::PayloadSerializeError` if the payload cannot be serialized to MessagePack format.
+    ///
+    /// Returns `MessageEncodeError::PayloadSerializeError` if the payload
+    /// cannot be serialized to MessagePack format.
     pub fn with_payload<T: serde::Serialize>(
         mut self,
         payload: &T,
@@ -251,9 +252,8 @@ impl MessageEncode for MessageBuilder {
         offset += RESERVED_SIZE;
 
         // Header length (4 bytes, big-endian)
-        let header_len = u32::try_from(header_data.len()).map_err(|_| {
-            MessageEncodeError::MessageTooLarge(header_data.len())
-        })?;
+        let header_len = u32::try_from(header_data.len())
+            .map_err(|_| MessageEncodeError::MessageTooLarge(header_data.len()))?;
         buffer[offset..offset + 4].copy_from_slice(&header_len.to_be_bytes());
         offset += 4;
 
@@ -278,11 +278,15 @@ impl MessageValidate for MessageBuilder {
     fn validate(&self) -> Result<(), MessageEncodeError> {
         match self.msg_type {
             MessageType::Join => self.validate_join_message(),
-            MessageType::Request | MessageType::Response => self.validate_request_response_message(),
+            MessageType::Request | MessageType::Response => {
+                self.validate_request_response_message()
+            }
             MessageType::Notification => self.validate_notification_message(),
             MessageType::Broadcast => self.validate_broadcast_message(),
             MessageType::Topic => self.validate_topic_message(),
-            MessageType::Subscribe | MessageType::Unsubscribe => self.validate_subscription_message(),
+            MessageType::Subscribe | MessageType::Unsubscribe => {
+                self.validate_subscription_message()
+            }
             MessageType::Ping | MessageType::Pong => self.validate_keepalive_message(),
         }
     }
@@ -313,7 +317,8 @@ impl MessageBuilder {
             || self.header.keepalive.is_some()
         {
             return Err(MessageEncodeError::InvalidConfiguration(
-                "Request/Response messages cannot have topic, auth, or keepalive fields".to_string(),
+                "Request/Response messages cannot have topic, auth, or keepalive fields"
+                    .to_string(),
             ));
         }
         // Validate routing has exactly one entry
@@ -339,7 +344,8 @@ impl MessageBuilder {
             || self.header.keepalive.is_some()
         {
             return Err(MessageEncodeError::InvalidConfiguration(
-                "Notification messages cannot have reqrep, topic, auth, or keepalive fields".to_string(),
+                "Notification messages cannot have reqrep, topic, auth, or keepalive fields"
+                    .to_string(),
             ));
         }
         Ok(())
@@ -353,7 +359,8 @@ impl MessageBuilder {
             || self.header.keepalive.is_some()
         {
             return Err(MessageEncodeError::InvalidConfiguration(
-                "Broadcast messages cannot have routing, reqrep, topic, auth, or keepalive fields".to_string(),
+                "Broadcast messages cannot have routing, reqrep, topic, auth, or keepalive fields"
+                    .to_string(),
             ));
         }
         Ok(())
@@ -389,7 +396,9 @@ impl MessageBuilder {
             || self.header.keepalive.is_some()
         {
             return Err(MessageEncodeError::InvalidConfiguration(
-                "Subscribe/Unsubscribe messages cannot have routing, reqrep, status, auth, or keepalive fields".to_string(),
+                "Subscribe/Unsubscribe messages cannot have routing, reqrep, status, auth, or \
+                 keepalive fields"
+                    .to_string(),
             ));
         }
         Ok(())
@@ -408,7 +417,8 @@ impl MessageBuilder {
             || self.header.auth.is_some()
         {
             return Err(MessageEncodeError::InvalidConfiguration(
-                "Ping/Pong messages cannot have routing, reqrep, topic, status, or auth fields".to_string(),
+                "Ping/Pong messages cannot have routing, reqrep, topic, status, or auth fields"
+                    .to_string(),
             ));
         }
         // Additional validation for PONG: ensure no interval
@@ -549,8 +559,9 @@ impl MessageBuilder {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_millis()
-        ).unwrap_or(0);
+                .as_millis(),
+        )
+        .unwrap_or(0);
         Self::ping_with_interval(client_id, timestamp, DEFAULT_KEEPALIVE_INTERVAL)
     }
 
@@ -561,10 +572,11 @@ impl MessageBuilder {
     }
 
     /// Build the message into a new Vec<u8>
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if the message validation fails or if serialization fails.
+    ///
+    /// Returns `MessageEncodeError` if the message validation fails or if
+    /// serialization fails.
     pub fn build_vec(&self) -> Result<Vec<u8>, MessageEncodeError> {
         let size = self.calculate_size()?;
         let mut buffer = vec![0u8; size];
@@ -573,10 +585,11 @@ impl MessageBuilder {
     }
 
     /// Calculate the size needed for the encoded message
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if header serialization fails or if the message would be too large.
+    ///
+    /// Returns `MessageEncodeError` if header serialization fails or if the
+    /// message would be too large.
     pub fn calculate_size(&self) -> Result<usize, MessageEncodeError> {
         let header_data = if self.is_header_empty() {
             Vec::new()

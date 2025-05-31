@@ -84,8 +84,8 @@ impl<'a> MessageDecode<'a> for Message<'a> {
         ]);
 
         let payload_offset = payload_len_offset + PAYLOAD_LEN_SIZE;
-        let total_expected_len = payload_offset + 
-            usize::try_from(payload_len).map_err(|_| {
+        let total_expected_len = payload_offset
+            + usize::try_from(payload_len).map_err(|_| {
                 MessageDeserializeError::InvalidHeaderData(
                     "Payload length too large for this platform".to_string(),
                 )
@@ -147,8 +147,7 @@ impl<'a> MessageDecode<'a> for Message<'a> {
     }
 
     fn payload_bytes(&self) -> &[u8] {
-        let payload_end = self.payload_offset + 
-            usize::try_from(self.payload_len).unwrap_or(0);
+        let payload_end = self.payload_offset + usize::try_from(self.payload_len).unwrap_or(0);
         &self.buffer[self.payload_offset..payload_end]
     }
 
@@ -184,11 +183,15 @@ impl<'a> Message<'a> {
 
         match self.msg_type {
             MessageType::Join => Self::validate_join_header(&header),
-            MessageType::Request | MessageType::Response => Self::validate_request_response_header(&header),
+            MessageType::Request | MessageType::Response => {
+                Self::validate_request_response_header(&header)
+            }
             MessageType::Notification => Self::validate_notification_header(&header),
             MessageType::Broadcast => Self::validate_broadcast_header(&header),
             MessageType::Topic => Self::validate_topic_header(&header),
-            MessageType::Subscribe | MessageType::Unsubscribe => Self::validate_subscription_header(&header),
+            MessageType::Subscribe | MessageType::Unsubscribe => {
+                Self::validate_subscription_header(&header)
+            }
             MessageType::Ping | MessageType::Pong => self.validate_keepalive_header(&header),
         }
     }
@@ -200,8 +203,7 @@ impl<'a> Message<'a> {
             || header.keepalive.is_some()
         {
             return Err(MessageDeserializeError::InvalidHeaderData(
-                "JOIN messages cannot have routing, reqrep, topic, or keepalive fields"
-                    .to_string(),
+                "JOIN messages cannot have routing, reqrep, topic, or keepalive fields".to_string(),
             ));
         }
         Ok(())
@@ -223,8 +225,7 @@ impl<'a> Message<'a> {
         if let Some(ref routing) = header.routing {
             if routing.len() != 1 {
                 return Err(MessageDeserializeError::InvalidRoutingData(
-                    "Request/Response messages must have exactly one routing entry"
-                        .to_string(),
+                    "Request/Response messages must have exactly one routing entry".to_string(),
                 ));
             }
         }
@@ -292,7 +293,8 @@ impl<'a> Message<'a> {
             || header.keepalive.is_some()
         {
             return Err(MessageDeserializeError::InvalidHeaderData(
-                "Subscribe/Unsubscribe messages cannot have routing, reqrep, status, auth, or keepalive fields"
+                "Subscribe/Unsubscribe messages cannot have routing, reqrep, status, auth, or \
+                 keepalive fields"
                     .to_string(),
             ));
         }

@@ -3,19 +3,21 @@ use crate::message::types::{Header, MessageDeserializeError, MessageEncodeError,
 /// Trait for decoding messages from binary data
 pub trait MessageDecode<'a> {
     /// Decode a message from a byte buffer
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageDeserializeError` if the buffer contains invalid message data.
+    ///
+    /// Returns `MessageDeserializeError` if the buffer contains invalid message
+    /// data.
     fn from_buffer(buffer: &'a [u8]) -> Result<Self, MessageDeserializeError>
     where
         Self: Sized;
 
     /// Decode a message from a mutable byte buffer
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageDeserializeError` if the buffer contains invalid message data.
+    ///
+    /// Returns `MessageDeserializeError` if the buffer contains invalid message
+    /// data.
     fn from_buffer_mut(buffer: &'a mut [u8]) -> Result<Self, MessageDeserializeError>
     where
         Self: Sized,
@@ -36,9 +38,9 @@ pub trait MessageDecode<'a> {
     fn header_bytes(&self) -> &[u8];
 
     /// Get the decoded header
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns `MessageDeserializeError` if the header cannot be deserialized.
     fn header(&self) -> Result<Header, MessageDeserializeError>;
 
@@ -46,10 +48,11 @@ pub trait MessageDecode<'a> {
     fn payload_bytes(&self) -> &[u8];
 
     /// Get the decoded payload as a specific type
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageDeserializeError` if the payload cannot be deserialized to the target type.
+    ///
+    /// Returns `MessageDeserializeError` if the payload cannot be deserialized
+    /// to the target type.
     fn payload<T>(&self) -> Result<T, MessageDeserializeError>
     where
         T: for<'de> serde::Deserialize<'de>;
@@ -67,16 +70,17 @@ pub trait MessageDecode<'a> {
 /// Trait for encoding messages to binary data
 pub trait MessageEncode {
     /// Calculate the size needed for the encoded message
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if header serialization fails or message is too large.
+    ///
+    /// Returns `MessageEncodeError` if header serialization fails or message is
+    /// too large.
     fn calculate_size(&self) -> Result<usize, MessageEncodeError>;
 
     /// Build the message into a new vector
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns `MessageEncodeError` if encoding fails or validation fails.
     fn build_vec(&self) -> Result<Vec<u8>, MessageEncodeError> {
         let size = self.calculate_size()?;
@@ -86,17 +90,19 @@ pub trait MessageEncode {
     }
 
     /// Build the message into an existing buffer
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if the buffer is too small or encoding fails.
+    ///
+    /// Returns `MessageEncodeError` if the buffer is too small or encoding
+    /// fails.
     fn build_into(&self, buffer: &mut [u8]) -> Result<usize, MessageEncodeError>;
 
     /// Build the message and return the buffer slice
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if the buffer is too small or encoding fails.
+    ///
+    /// Returns `MessageEncodeError` if the buffer is too small or encoding
+    /// fails.
     fn build<'a>(&self, buffer: &'a mut [u8]) -> Result<&'a [u8], MessageEncodeError> {
         let size = self.build_into(buffer)?;
         Ok(&buffer[..size])
@@ -106,10 +112,11 @@ pub trait MessageEncode {
 /// Trait for message validation
 pub trait MessageValidate {
     /// Validate the message structure according to protocol rules
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if the message structure violates protocol rules.
+    ///
+    /// Returns `MessageEncodeError` if the message structure violates protocol
+    /// rules.
     fn validate(&self) -> Result<(), MessageEncodeError>;
 }
 
@@ -134,18 +141,19 @@ pub trait PayloadAccess {
     fn set_payload_bytes(&mut self, payload: Vec<u8>);
 
     /// Get the payload as a specific type
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageDeserializeError` if the payload cannot be deserialized to the target type.
+    ///
+    /// Returns `MessageDeserializeError` if the payload cannot be deserialized
+    /// to the target type.
     fn payload<T>(&self) -> Result<T, MessageDeserializeError>
     where
         T: for<'de> serde::Deserialize<'de>;
 
     /// Set the payload from a serializable type
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns `MessageEncodeError` if the payload cannot be serialized.
     fn set_payload<T>(&mut self, payload: &T) -> Result<(), MessageEncodeError>
     where
@@ -160,10 +168,11 @@ pub trait Message<'a>:
     fn new(msg_type: MessageType, client_id: u32) -> Self;
 
     /// Clone the message data into a new owned message
-    /// 
+    ///
     /// # Errors
-    /// 
-    /// Returns `MessageEncodeError` if the message cannot be cloned or validated.
+    ///
+    /// Returns `MessageEncodeError` if the message cannot be cloned or
+    /// validated.
     fn to_owned(&self) -> Result<OwnedMessage, MessageEncodeError>;
 }
 
@@ -215,9 +224,8 @@ impl MessageEncode for OwnedMessage {
         offset += 16;
 
         // Header length (big-endian)
-        let header_len = u32::try_from(header_data.len()).map_err(|_| {
-            MessageEncodeError::MessageTooLarge(header_data.len())
-        })?;
+        let header_len = u32::try_from(header_data.len())
+            .map_err(|_| MessageEncodeError::MessageTooLarge(header_data.len()))?;
         buffer[offset..offset + 4].copy_from_slice(&header_len.to_be_bytes());
         offset += 4;
 
