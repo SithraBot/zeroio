@@ -1,6 +1,6 @@
 [package]
-name = "zeroio"
-version = "0.1.0"
+name = "zeroio-protocol"
+version.workspace = true
 edition.workspace = true
 
 [lints]
@@ -8,9 +8,12 @@ workspace = true
 
 [dependencies]
 
+# Async runtime
+tokio = { version = "1.45", features = ["full"] }
+futures = "0.3"
+
 # External crates
 serde.workspace = true
 rmp-serde.workspace = true
-bytes = "1.10"
+bytes.workspace = true
 thiserror.workspace = true
-

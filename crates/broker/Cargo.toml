@@ -1,0 +1,9 @@
+[package]
+name = "zeroio-broker"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

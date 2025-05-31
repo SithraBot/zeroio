@@ -1,0 +1,9 @@
+[package]
+name = "zeroio-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
