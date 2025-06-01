@@ -1,31 +1,38 @@
-# fleximq
+# fleximq.rs (Rust Implementation of the fleximq Protocol)
 
-fleximq is a modern, high-performance communication library designed for distributed applications. It implements a custom binary protocol with centralized broker architecture, optimized for maximum throughput and minimal memory allocation. The library follows Rust's ownership principles while providing ZeroMQ-like communication patterns.
+`fleximq.rs` is a Rust implementation of the [fleximq protocol](https://github.com/fleximq/spec). This library aims to provide Rust developers with a modern, high-performance, and idiomatic set of tools for using the fleximq protocol in distributed applications.
+
+For a detailed understanding of the fleximq protocol's design goals, architecture, and core concepts, please refer to the official [protocol specification repository's README](https://github.com/fleximq/spec/blob/main/README.md) ([Chinese version README_zh.md](https://github.com/fleximq/spec/blob/main/README_zh.md)).
 
 ## Features
 
-- **Clean Architecture**: Layered design separating protocol, core, and API concerns
-- **Transport Agnostic**: Pluggable transport layer supporting TCP, IPC, WebSocket, and STDIO
-- **Middleware System**: Extensible processing pipeline with built-in auth, logging, metrics, and rate limiting
-- **Async-First Design**: Full tokio integration with proper cancellation support
-- **Memory Efficient**: Buffer pools, minimal allocations, bounded message sizes
-- **High-Performance Routing**: LRU caching, DashMap-based client registry, atomic metrics
-- **Connection Management**: Automatic client ID assignment, connection pooling, idle cleanup
-- **Multiple Transport Layers**: STDIO (primary), TCP, IPC, WebSocket support
-- **Multiple Languages**: Rust, JavaScript(coming soon), and more
-- **MessagePack Serialization**: for efficient structured data encoding
-- **Eight Message Types**: Join, Request/Response, Notification, Broadcast, Topic Publish, Subscribe/Unsubscribe
-- **Centralized Broker Architecture**: with high-performance message routing
-- **Cross-Platform Binary Protocol**: with network byte order encoding
-- **ULID Correlation IDs**: for efficient request tracking
-- **Concurrent Data Structures**: for maximum throughput
-- **Built-in Performance Monitoring**: with atomic metrics
-- **Configurable Limits**: and timeouts for production deployments
-- **Authentication Support**: with pluggable auth mechanisms
+- **Rust Implementation**: Leverages Rust's safety, concurrency, and performance for implementing the fleximq protocol.
+
+- **Clean Architecture**: Well-defined layers for protocol handling, core logic, and API within the Rust codebase.
+
+- **Pluggable Transport Layer**: Supports multiple transport backends (TCP, IPC, WebSocket, STDIO) for flexible deployment of Rust applications.
+
+- **Extensible Middleware System**: Provides a Rust-based pipeline for custom processing (e.g., auth, logging, metrics).
+
+- **Async-First with Tokio**: Deep integration with Tokio for idiomatic, high-performance asynchronous operations in Rust.
+
+- **Memory-Efficient Design**: Employs buffer pools and Rust's ownership model to minimize allocations and manage memory safely.
+
+- **High-Performance Broker Core**: Features an LRU cache for routing, a DashMap-based client registry, and atomic metrics in its Rust-based broker.
+
+- **Robust Connection Management**: Includes automatic client ID assignment, connection pooling, and idle connection cleanup.
+
+- **Concurrent by Design**: Built with Rust's concurrency primitives to maximize throughput safely.
+
+- **Built-in Performance Metrics**: Offers atomic metrics for real-time monitoring of the library's state.
+
+- **Production-Ready Configuration**: Allows fine-tuning of limits and timeouts for robust Rust deployments.
+
+- **Flexible Authentication**: Supports pluggable authentication modules for the broker.
 
 ## Protocol
 
-See [draft.md](https://github.com/fleximq/spec) for complete protocol specification.
+The fleximq protocol specification that this library implements can be found at [fleximq/spec/draft/v1.0.0.md](https://github.com/fleximq/spec/blob/main/draft/v1.0.0.md).
 
 ## Contributing
 
