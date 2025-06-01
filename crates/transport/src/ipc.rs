@@ -224,16 +224,16 @@ impl PlatformAdapter {
             // For Windows, extract pipe name from file paths
             if path.contains(':') || path.contains('\\') {
                 let path_buf = PathBuf::from(path);
-                if let Some(filename) = path_buf.file_name() {
-                    let clean_name = if let Some(stem) = path_buf.file_stem() {
-                        stem.to_string_lossy().to_string()
-                    } else {
-                        filename.to_string_lossy().to_string()
-                    };
-                    PathBuf::from(clean_name)
-                } else {
-                    PathBuf::from(path)
-                }
+                path_buf.file_name().map_or_else(
+                    || PathBuf::from(path),
+                    |filename| {
+                        let clean_name = path_buf.file_stem().map_or_else(
+                            || filename.to_string_lossy().to_string(),
+                            |stem| stem.to_string_lossy().to_string(),
+                        );
+                        PathBuf::from(clean_name)
+                    },
+                )
             } else {
                 PathBuf::from(path)
             }
