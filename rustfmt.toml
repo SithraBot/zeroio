@@ -45,7 +45,7 @@ trailing_semicolon = true
 space_before_colon = false
 space_after_colon = true
 spaces_around_ranges = false
-newline_style = "Unix"
+newline_style = "Auto"
 
 # Match formatting
 match_block_trailing_comma = false
@@ -65,3 +65,7 @@ format_macro_bodies = true
 # Error handling
 error_on_line_overflow = false
 error_on_unformatted = false
+
+# Cross-platform compatibility
+normalize_comments = true
+skip_children = false
