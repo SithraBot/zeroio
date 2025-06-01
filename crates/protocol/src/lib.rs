@@ -55,7 +55,7 @@ pub use message::{decode::Message, encode::MessageBuilder};
 pub const PROTOCOL_VERSION: u8 = 1;
 
 // Performance and limit constants
-pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16MB
+pub const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 1024; // 1GB
 pub const MAX_HEADER_SIZE: usize = 64 * 1024; // 64KB
 pub const BASE_HEADER_SIZE: usize = 34;
 pub const DEFAULT_BUFFER_SIZE: usize = 8192;

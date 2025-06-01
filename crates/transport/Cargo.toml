@@ -4,6 +4,42 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+zeroio-protocol = { path = "../protocol" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Data structures
+bytes = { workspace = true }
+lru = { workspace = true }
+dashmap = { workspace = true }
+
+# URL parsing
+url = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Socket utilities
+socket2 = { version = "0.5", features = ["all"] }
+
+# WebSocket
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+futures-util = "0.3"
+http = "1.3"
+
+[dev-dependencies]
+mockall = "0.13"
+tokio-test = "0.4"
+futures = "0.3"
+tempfile = "3.20"
 
 [lints]
 workspace = true

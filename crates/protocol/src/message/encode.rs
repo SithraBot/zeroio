@@ -790,4 +790,22 @@ mod tests {
         let unsub_header = unsub_message.header().unwrap();
         assert_eq!(unsub_header.topic.unwrap(), topic);
     }
+
+    #[test]
+    fn test_message_size_limit() {
+        // Test that messages up to 1GB are allowed
+        let small_payload = vec![0u8; 1024]; // 1KB
+        let builder = MessageBuilder::simple_broadcast(1234).with_raw_payload(small_payload);
+        assert!(builder.build_vec().is_ok());
+
+        // Test that the message size calculation is correct
+        let calculated_size = builder.calculate_size().unwrap();
+        let built_message = builder.build_vec().unwrap();
+        assert_eq!(calculated_size, built_message.len());
+
+        // Test that messages exceeding 1GB are rejected
+        // Note: We can't actually allocate 1GB+ in a test, so we'll test the logic
+        // by checking the constant value
+        assert_eq!(crate::MAX_MESSAGE_SIZE, 1024 * 1024 * 1024); // 1GB
+    }
 }

@@ -14,8 +14,6 @@ use bytes::{Bytes, BytesMut};
 pub struct BufferManager {
     pools:     Vec<BufferPool>,
     alignment: usize,
-    #[allow(dead_code)]
-    page_size: usize,
     metrics:   Arc<BufferMetrics>,
 }
 
@@ -23,7 +21,6 @@ impl BufferManager {
     /// Create new buffer manager with specified alignment
     #[must_use]
     pub fn new(alignment: usize) -> Self {
-        let page_size = Self::get_page_size();
         let pools = vec![
             BufferPool::new(1024, 64),     // Small messages (1KB)
             BufferPool::new(8192, 32),     // Medium messages (8KB)
@@ -34,7 +31,6 @@ impl BufferManager {
         Self {
             pools,
             alignment,
-            page_size,
             metrics: Arc::new(BufferMetrics::default()),
         }
     }
@@ -96,18 +92,6 @@ impl BufferManager {
             len: 0,
             layout,
         })
-    }
-
-    /// Get system page size
-    fn get_page_size() -> usize {
-        unsafe {
-            let page_size = libc::sysconf(libc::_SC_PAGESIZE);
-            if page_size > 0 {
-                usize::try_from(page_size).unwrap_or(4096)
-            } else {
-                4096 // Default page size fallback
-            }
-        }
     }
 
     /// Get buffer manager metrics
@@ -359,136 +343,52 @@ impl MessageAssembler {
     }
 }
 
-/// Memory-mapped buffer for large message processing
+/// Memory-mapped buffer for large message processing (Currently Not Available)
 pub struct MappedBuffer {
-    ptr:             NonNull<u8>,
-    len:             usize,
-    file_descriptor: Option<i32>,
+    // Retain fields for API compatibility, but they won't be used meaningfully.
+    _ptr: Option<NonNull<u8>>,
+    _len: usize,
 }
 
 impl MappedBuffer {
-    /// Create memory-mapped buffer from file
+    /// Create memory-mapped buffer from file (Currently Not Available)
     ///
     /// # Errors
     ///
-    /// Returns `BufferError` if:
-    /// - The file path contains null bytes
-    /// - The file cannot be opened
-    /// - File stat operation fails
-    /// - Memory mapping fails
-    /// - File size is invalid or too large for the target platform
-    ///
-    /// # Panics
-    ///
-    /// May panic if the memory mapping returns a null pointer unexpectedly
-    pub fn from_file(path: &str) -> Result<Self, BufferError> {
-        use std::ffi::CString;
-
-        let c_path = CString::new(path.as_bytes()).map_err(|_| BufferError::InvalidPath)?;
-
-        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
-        if fd < 0 {
-            return Err(BufferError::FileOpenFailed);
-        }
-
-        let mut stat: libc::stat = unsafe { std::mem::zeroed() };
-        if unsafe { libc::fstat(fd, &mut stat) } < 0 {
-            unsafe { libc::close(fd) };
-            return Err(BufferError::StatFailed);
-        }
-
-        let len = usize::try_from(stat.st_size).map_err(|_| BufferError::InvalidSize)?;
-        let ptr = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                len,
-                libc::PROT_READ,
-                libc::MAP_PRIVATE,
-                fd,
-                0,
-            )
-        };
-
-        if ptr == libc::MAP_FAILED {
-            unsafe { libc::close(fd) };
-            return Err(BufferError::MmapFailed);
-        }
-
-        Ok(Self {
-            ptr: unsafe { NonNull::new_unchecked(ptr as *mut u8) },
-            len,
-            file_descriptor: Some(fd),
-        })
+    /// This function currently always returns `BufferError::MmapUnavailable`.
+    pub fn from_file(_path: &str) -> Result<Self, BufferError> {
+        Err(BufferError::MmapUnavailable)
     }
 
-    /// Create anonymous memory mapping
+    /// Create anonymous memory mapping (Currently Not Available)
     ///
     /// # Errors
     ///
-    /// Returns `BufferError::MmapFailed` if the memory mapping operation fails
-    ///
-    /// # Panics
-    ///
-    /// May panic if the memory mapping returns a null pointer unexpectedly
-    pub fn anonymous(size: usize) -> Result<Self, BufferError> {
-        let ptr = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                -1,
-                0,
-            )
-        };
-
-        if ptr == libc::MAP_FAILED {
-            return Err(BufferError::MmapFailed);
-        }
-
-        Ok(Self {
-            ptr:             unsafe { NonNull::new_unchecked(ptr as *mut u8) },
-            len:             size,
-            file_descriptor: None,
-        })
+    /// This function currently always returns `BufferError::MmapUnavailable`.
+    pub fn anonymous(_size: usize) -> Result<Self, BufferError> {
+        Err(BufferError::MmapUnavailable)
     }
 
-    /// Get buffer as slice
+    /// Get buffer as slice (Currently Not Available)
     #[must_use]
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+        // Returns an empty slice as the buffer is not functional.
+        &[]
     }
 
-    /// Advise kernel about access pattern
+    /// Advise kernel about access pattern (Currently Not Available)
     ///
     /// # Errors
     ///
-    /// Returns `BufferError::AllocationFailed` if the madvise system call fails
+    /// This function currently always returns `BufferError::MmapUnavailable`.
     pub fn advise_sequential(&self) -> Result<(), BufferError> {
-        let result = unsafe {
-            libc::madvise(
-                self.ptr.as_ptr() as *mut libc::c_void,
-                self.len,
-                libc::MADV_SEQUENTIAL,
-            )
-        };
-
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(BufferError::AllocationFailed)
-        }
+        Err(BufferError::MmapUnavailable)
     }
 }
 
 impl Drop for MappedBuffer {
     fn drop(&mut self) {
-        unsafe {
-            libc::munmap(self.ptr.as_ptr() as *mut libc::c_void, self.len);
-            if let Some(fd) = self.file_descriptor {
-                libc::close(fd);
-            }
-        }
+        // No-op as the buffer is not functional.
     }
 }
 
@@ -649,6 +549,8 @@ pub enum BufferError {
     MmapFailed,
     #[error("madvise system call failed")]
     MadviseFailed,
+    #[error("Memory mapping functionality is unavailable on this platform or build.")]
+    MmapUnavailable,
 }
 
 #[cfg(test)]

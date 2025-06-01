@@ -273,7 +273,7 @@ Payload: (empty)
 | TCP       | tcp://     | TCP socket connection       | Client               | Broker              |
 | IPC       | ipc://     | Inter-process communication | Client               | Broker              |
 | WebSocket | ws://      | WebSocket connection        | Client               | Broker              |
-| STDIO     | stdio://   | Standard input/output pipes | Either               | Broker              |
+| STDIO     | stdio://   | Standard input/output pipes | Broker               | Broker              |
 
 ### Transport URLs
 
@@ -281,6 +281,16 @@ Payload: (empty)
 - **IPC**: `ipc:///path/to/socket` (e.g., `ipc:///tmp/zeroio.sock`)
 - **WebSocket**: `ws://hostname:port/path` (e.g., `ws://localhost:8080/ws`)
 - **STDIO**: `stdio://` (standard input/output pipes)
+
+### STDIO Transport Details
+
+The STDIO transport is specifically designed for subprocess communication where the broker launches client processes:
+
+- **Connection Initiator**: Always the broker (launches subprocess)
+- **Communication Channel**: Parent-child process pipes (stdin/stdout)
+- **Use Case**: Broker spawns worker processes or specialized handlers
+- **Process Lifecycle**: Managed by broker, terminated on disconnect
+- **Security**: Inherits broker's process permissions and environment
 
 ## ClientID Assignment and Handshake
 
@@ -400,9 +410,9 @@ Base Header:
 
 ## Message Size Limits
 
-- **Maximum message size**: 16MB (16,777,216 bytes)
+- **Maximum message size**: 1GB (1,073,741,824 bytes)
 - **Maximum header size**: 64KB (65,536 bytes)
-- **Maximum payload size**: 16MB - header size - base header size
+- **Maximum payload size**: 1GB - header size - base header size
 - **Minimum message size**: 34 bytes (empty header and payload)
 - **Keep-alive message size**: ~60 bytes (base header + keep-alive header)
 
