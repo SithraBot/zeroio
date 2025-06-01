@@ -304,6 +304,7 @@ impl PlatformAdapter {
 mod tests {
     use std::sync::Arc;
 
+    #[cfg(unix)]
     use tempfile::tempdir;
     use tokio::sync::Mutex;
 
@@ -575,5 +576,54 @@ mod tests {
                 close_result.err()
             );
         }
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn test_ipc_directory_creation() {
+        let transport = IpcTransport::new();
+
+        // Test 1: Simple /tmp path (should not create directory)
+        let simple_url = "ipc://simple_test.sock";
+        let listener_result = transport.listen(simple_url).await;
+        assert!(
+            listener_result.is_ok(),
+            "Failed to create listener for simple path"
+        );
+        if let Ok(mut listener) = listener_result {
+            listener.close().await.ok();
+        }
+
+        // Test 2: Nested path in /tmp (should create nested directories)
+        let nested_url = format!(
+            "ipc:///tmp/nested_test_{}/deep/socket.sock",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        let listener_result = transport.listen(&nested_url).await;
+        assert!(
+            listener_result.is_ok(),
+            "Failed to create listener for nested path"
+        );
+        if let Ok(mut listener) = listener_result {
+            listener.close().await.ok();
+        }
+
+        // Test 3: Custom directory path (should create directories if needed)
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let custom_path = temp_dir.path().join("custom").join("path").join("socket.sock");
+        let custom_url = format!("ipc://{}", custom_path.display());
+        let listener_result = transport.listen(&custom_url).await;
+        assert!(
+            listener_result.is_ok(),
+            "Failed to create listener for custom path"
+        );
+        if let Ok(mut listener) = listener_result {
+            listener.close().await.ok();
+        }
+
+        println!("Directory creation tests completed successfully");
     }
 }

@@ -50,9 +50,12 @@ pub async fn listen(path: &Path) -> TransportResult<PlatformListener> {
         std::fs::remove_file(path).ok();
     }
 
-    // Create parent directory if needed
+    // Create parent directory if needed and it doesn't exist
+    // This handles custom paths like /var/run/myapp/ or /tmp/nested/path/
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
     }
 
     let listener = UnixListener::bind(path).map_err(|e| {

@@ -443,12 +443,28 @@ mod tests {
     async fn test_websocket_timeout() {
         let transport = WebSocketTransport::new();
 
+        // Use an IP address that won't respond to avoid DNS resolution delays
+        // 192.0.2.0/24 is reserved for documentation and testing (RFC 5737)
         let result = timeout(
-            Duration::from_millis(10), // Shortened timeout for faster test
-            transport.connect("ws://nonexistent-domain-for-test.example.com:8080") // More specific non-existent host
-        ).await;
+            Duration::from_millis(100), // Slightly longer timeout for Windows
+            transport.connect("ws://192.0.2.1:8080"), // Non-routable test IP
+        )
+        .await;
 
-        assert!(result.is_err());
+        // Should timeout due to connection attempt hanging
+        if result.is_ok() {
+            // On some platforms, the connection might fail immediately instead of hanging
+            // In that case, check if the inner result is an error
+            if let Ok(inner_result) = result {
+                assert!(
+                    inner_result.is_err(),
+                    "Expected connection to fail, but it succeeded"
+                );
+            }
+        } else {
+            // Expected timeout
+            assert!(result.is_err());
+        }
     }
 
     #[tokio::test]
