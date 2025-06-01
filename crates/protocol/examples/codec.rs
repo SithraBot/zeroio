@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use zeroio_protocol::{Auth, Message, MessageBuilder, MessageDecode, StatusCode};
+use fleximq_protocol::{Auth, Message, MessageBuilder, MessageDecode, StatusCode};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct SimplePayload {
@@ -8,7 +8,7 @@ struct SimplePayload {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("ZeroIO Protocol V1 Examples\n");
+    println!("fleximq Protocol V1 Examples\n");
 
     // 1. Join Message (new in V1)
     let join_encoded =

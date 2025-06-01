@@ -1,4 +1,4 @@
-//! Transport layer implementation for zeroio protocol
+//! Transport layer implementation for fleximq protocol
 //!
 //! Supports multiple transport types:
 //! - TCP: Traditional TCP socket connections

@@ -1,4 +1,4 @@
-# Contributing to zeroio
+# Contributing to fleximq
 
 We welcome all contributions to make this project better.
 
@@ -18,8 +18,8 @@ We welcome all contributions to make this project better.
 ### Development Setup
 
 ```bash
-git clone https://github.com/SithraBot/zeroio.git
-cd zeroio
+git clone https://github.com/fleximq/fleximq.rs.git
+cd fleximq.rs
 cargo build
 cargo test --workspace
 ```

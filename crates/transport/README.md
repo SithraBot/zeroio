@@ -1,6 +1,6 @@
-# zeroio-transport
+# fleximq-transport
 
-Transport layer implementation for the zeroio protocol, providing multiple transport mechanisms with a unified interface.
+Transport layer implementation for the fleximq protocol, providing multiple transport mechanisms with a unified interface.
 
 ## Features
 
@@ -18,7 +18,7 @@ Transport layer implementation for the zeroio protocol, providing multiple trans
 ## Usage
 
 ```rust
-use zeroio_transport::{TransportManager, TransportStream};
+use fleximq_transport::{TransportManager, TransportStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - **TCP**: `tcp://hostname:port` (e.g., `tcp://localhost:8080`)
 - **IPC**: 
-  - Unix: `ipc:///path/to/socket` (e.g., `ipc:///tmp/zeroio.sock`)
+  - Unix: `ipc:///path/to/socket` (e.g., `ipc:///tmp/fleximq.sock`)
   - Windows: `ipc://pipe_name` (converted to `\\.\pipe\pipe_name`)
 - **STDIO**: `stdio://command args` (e.g., `stdio://python script.py`)
 - **WebSocket**: `ws://hostname:port/path` or `wss://` for secure (not yet implemented)
@@ -64,7 +64,7 @@ The transport layer follows a modular design:
 
 ### TCP Transport
 ```rust
-use zeroio_transport::tcp::{TcpTransport, TcpConfig};
+use fleximq_transport::tcp::{TcpTransport, TcpConfig};
 
 let config = TcpConfig {
     nodelay: true,
@@ -77,7 +77,7 @@ let transport = TcpTransport::with_config(config);
 
 ### IPC Transport
 ```rust
-use zeroio_transport::ipc::{IpcTransport, IpcConfig};
+use fleximq_transport::ipc::{IpcTransport, IpcConfig};
 
 let config = IpcConfig {
     buffer_size: 65536, // 64KB
@@ -88,7 +88,7 @@ let transport = IpcTransport::with_config(config);
 
 ### STDIO Transport
 ```rust
-use zeroio_transport::stdio::{StdioTransport, StdioConfig};
+use fleximq_transport::stdio::{StdioTransport, StdioConfig};
 
 let config = StdioConfig {
     command: "python".to_string(),

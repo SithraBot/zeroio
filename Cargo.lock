@@ -214,6 +214,54 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fleximq"
+version = "0.1.0"
+
+[[package]]
+name = "fleximq-broker"
+version = "0.1.0"
+
+[[package]]
+name = "fleximq-client"
+version = "0.1.0"
+
+[[package]]
+name = "fleximq-protocol"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "lru",
+ "memchr",
+ "once_cell",
+ "rmp-serde",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "fleximq-server"
+version = "0.1.0"
+
+[[package]]
+name = "fleximq-transport"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "dashmap",
+ "futures-util",
+ "http",
+ "lru",
+ "mockall",
+ "socket2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1333,54 +1381,6 @@ dependencies = [
  "quote",
  "syn",
  "synstructure",
-]
-
-[[package]]
-name = "zeroio"
-version = "0.1.0"
-
-[[package]]
-name = "zeroio-broker"
-version = "0.1.0"
-
-[[package]]
-name = "zeroio-client"
-version = "0.1.0"
-
-[[package]]
-name = "zeroio-protocol"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "lru",
- "memchr",
- "once_cell",
- "rmp-serde",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "zeroio-server"
-version = "0.1.0"
-
-[[package]]
-name = "zeroio-transport"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bytes",
- "dashmap",
- "futures-util",
- "http",
- "lru",
- "mockall",
- "socket2",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-tungstenite",
- "url",
 ]
 
 [[package]]

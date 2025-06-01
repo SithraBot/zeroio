@@ -1,5 +1,5 @@
 [package]
-name = "zeroio-server"
+name = "fleximq-server"
 edition.workspace = true
 version.workspace = true
 

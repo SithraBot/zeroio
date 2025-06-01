@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use zeroio_transport::{TcpTransport, Transport, TransportStream};
+use fleximq_transport::{TcpTransport, Transport, TransportStream};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

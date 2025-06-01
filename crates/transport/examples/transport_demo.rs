@@ -1,7 +1,7 @@
 //! Example demonstrating transport usage with connection tracking
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use zeroio_transport::{TransportManager, TransportStream};
+use fleximq_transport::{TransportManager, TransportStream};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,7 +69,7 @@ async fn demo_ipc(manager: &TransportManager) -> Result<(), Box<dyn std::error::
     let ipc_path = if cfg!(windows) {
         "ipc://test_pipe"
     } else {
-        "ipc:///tmp/zeroio_test.sock"
+        "ipc:///tmp/fleximq_test.sock"
     };
 
     println!("   Attempting to connect to {}", ipc_path);
@@ -131,7 +131,7 @@ fn demo_stats(manager: &TransportManager) {
     println!("   Active ratio: {:.1}%", stats.active_ratio() * 100.0);
 
     // Demo connection frequency tracking
-    let test_urls = ["tcp://localhost:8080", "ipc:///tmp/zeroio_test.sock", "stdio://echo test"];
+    let test_urls = ["tcp://localhost:8080", "ipc:///tmp/fleximq_test.sock", "stdio://echo test"];
 
     for url in &test_urls {
         if let Some(frequency) = manager.get_connection_frequency(url) {

@@ -1,4 +1,4 @@
-# zeroio Protocol V1
+# fleximq Protocol V1
 
 > Note: All multi-byte numeric values in this protocol are encoded in network byte order (big-endian).
 > All structured data (Header and Payload) uses MessagePack format for serialization.
@@ -11,7 +11,7 @@ The current protocol version is 1. This is indicated by the `Version` field in t
 
 ### 1.2. Key Design Goals
 
-to provide a versatile, programming language-agnostic, and cross-platform messaging protocol. It supports various communication patterns like request/response, pub/sub, and notifications over multiple transport layers. The protocol is designed with a focus on efficiency and clear semantics, making it suitable for distributed systems, plugin architectures, and optimized for Internet of Things (IoT) applications. Compared to protocols like MQTT, zeroio offers a broader and more complex range of communication modes.
+to provide a versatile, programming language-agnostic, and cross-platform messaging protocol. It supports various communication patterns like request/response, pub/sub, and notifications over multiple transport layers. The protocol is designed with a focus on efficiency and clear semantics, making it suitable for distributed systems, plugin architectures, and optimized for Internet of Things (IoT) applications. Compared to protocols like MQTT, fleximq offers a broader and more complex range of communication modes.
 
 ### 1.3. Encoding
 
@@ -585,8 +585,8 @@ These examples illustrate common URL formats for connecting to a broker.
 - **TCP**: `tcp://hostname:port`
   - Example: `tcp://localhost:8080`, `tcp://192.168.1.100:7890`
 - **IPC**: `ipc:///path/to/socket` (Unix-like) or `ipc://pipename` (Windows-like)
-  - Example (Unix): `ipc:///tmp/zeroio.sock`
-  - Example (Windows): `ipc://zeroio_pipe`
+  - Example (Unix): `ipc:///tmp/fleximq.sock`
+  - Example (Windows): `ipc://fleximq_pipe`
   - See Section 6.3 for detailed IPC path handling.
 - **WebSocket**: `ws://hostname:port/path` (or `wss://` for secure WebSocket)
   - Example: `ws://localhost:8080/ws`, `wss://example.com/messaging`

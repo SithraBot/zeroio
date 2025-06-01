@@ -1,6 +1,6 @@
-# zeroio
+# fleximq
 
-zeroio is a modern, high-performance communication library designed for distributed applications. It implements a custom binary protocol with centralized broker architecture, optimized for maximum throughput and minimal memory allocation. The library follows Rust's ownership principles while providing ZeroMQ-like communication patterns.
+fleximq is a modern, high-performance communication library designed for distributed applications. It implements a custom binary protocol with centralized broker architecture, optimized for maximum throughput and minimal memory allocation. The library follows Rust's ownership principles while providing ZeroMQ-like communication patterns.
 
 ## Features
 
@@ -34,11 +34,11 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ### Development Setup
 
 ```bash
-git clone https://github.com/your-org/zeroio.git
-cd zeroio
+git clone https://github.com/your-org/fleximq.git
+cd fleximq
 cargo test --all-features
-cargo test --package zeroio --lib protocol::tests
-cargo test --package zeroio --lib router::tests
+cargo test --package fleximq --lib protocol::tests
+cargo test --package fleximq --lib router::tests
 ```
 
 ## License

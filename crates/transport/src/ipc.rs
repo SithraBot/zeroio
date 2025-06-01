@@ -507,7 +507,7 @@ mod tests {
         // Test connection to non-existent socket
         // Using a fixed name, assuming it's unlikely to exist during tests.
         // Adding a timestamp or a counter could make it more unique if needed.
-        let non_existent_socket = "ipc:///tmp/non_existent_socket_for_zeroio_test.sock";
+        let non_existent_socket = "ipc:///tmp/non_existent_socket_for_fleximq_test.sock";
         let result = transport.connect(non_existent_socket).await;
         assert!(matches!(result, Err(TransportError::ConnectionFailed(_))));
     }

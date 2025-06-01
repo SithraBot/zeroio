@@ -1,4 +1,4 @@
-# zeroio 协议 V1
+# fleximq 协议 V1
 
 > 注意：本协议中所有多字节数值均采用网络字节序（大端序）编码。
 > 所有结构化数据（Header 和 Payload）均使用 MessagePack 格式进行序列化。
@@ -11,7 +11,7 @@
 
 ### 1.2. 主要设计目标
 
-旨在提供一个通用的、编程语言无关的、跨平台的消息传递协议。它支持多种通信模式，如请求/响应、发布/订阅和通知，可运行于多种传输层之上。该协议注重效率和清晰的语义定义，使其适用于分布式系统、插件系统，并为物联网（IoT）应用进行了优化。与 MQTT 等协议相比，zeroio 支持更广泛也更复杂的通信模式。
+旨在提供一个通用的、编程语言无关的、跨平台的消息传递协议。它支持多种通信模式，如请求/响应、发布/订阅和通知，可运行于多种传输层之上。该协议注重效率和清晰的语义定义，使其适用于分布式系统、插件系统，并为物联网（IoT）应用进行了优化。与 MQTT 等协议相比，fleximq 支持更广泛也更复杂的通信模式。
 
 ### 1.3. 编码
 
@@ -587,8 +587,8 @@ _(示例: 这可能是一条 REQ 消息, Type=0x01)_
 - **TCP**: `tcp://hostname:port`
   - 示例: `tcp://localhost:8080`, `tcp://192.168.1.100:7890`
 - **IPC**: `ipc:///path/to/socket` (类 Unix) 或 `ipc://pipename` (类 Windows)
-  - 示例 (Unix): `ipc:///tmp/zeroio.sock`
-  - 示例 (Windows): `ipc://zeroio_pipe`
+  - 示例 (Unix): `ipc:///tmp/fleximq.sock`
+  - 示例 (Windows): `ipc://fleximq_pipe`
   - 有关详细的 IPC 路径处理，请参见章节 6.3。
 - **WebSocket**: `ws://hostname:port/path` (或 `wss://` 用于安全 WebSocket)
   - 示例: `ws://localhost:8080/ws`, `wss://example.com/messaging`

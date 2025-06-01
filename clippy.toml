@@ -1,4 +1,4 @@
-# Clippy configuration for zeroio project
+# Clippy configuration for fleximq project
 
 # Complexity thresholds
 cognitive-complexity-threshold = 30

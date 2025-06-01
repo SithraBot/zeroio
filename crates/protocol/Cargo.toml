@@ -1,5 +1,5 @@
 [package]
-name = "zeroio-protocol"
+name = "fleximq-protocol"
 version.workspace = true
 edition.workspace = true
 

@@ -1,4 +1,4 @@
-# Rust formatting configuration for zeroio project
+# Rust formatting configuration for fleximq project
 
 # Edition and basic settings
 edition = "2021"

@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use zeroio_transport::{Transport, TransportStream, WebSocketTransport};
+use fleximq_transport::{Transport, TransportStream, WebSocketTransport};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

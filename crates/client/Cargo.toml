@@ -1,5 +1,5 @@
 [package]
-name = "zeroio-client"
+name = "fleximq-client"
 version.workspace = true
 edition.workspace = true
 

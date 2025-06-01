@@ -1,5 +1,5 @@
 [package]
-name = "zeroio-transport"
+name = "fleximq-transport"
 edition.workspace = true
 version.workspace = true
 
