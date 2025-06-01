@@ -282,6 +282,30 @@ Payload: (empty)
 - **WebSocket**: `ws://hostname:port/path` (e.g., `ws://localhost:8080/ws`)
 - **STDIO**: `stdio://` (standard input/output pipes)
 
+### IPC Path Handling
+
+The IPC transport implements platform-specific path processing for optimal cross-platform compatibility:
+
+#### Unix Domain Sockets
+- **Path Format**: `/path/to/socket.sock` or relative paths
+- **Default Directory**: `/tmp` for relative paths (e.g., `socket.sock` → `/tmp/socket.sock`)
+- **Directory Creation**: Automatically creates parent directories only when they don't exist
+- **Path Preservation**: Absolute paths are used as-is, avoiding unnecessary directory operations
+- **Cleanup**: Socket files are removed on listener close
+
+#### Windows Named Pipes
+- **Path Format**: Simple pipe names or file-style paths
+- **Name Extraction**: File paths (e.g., `C:\temp\app.pipe`) are converted to pipe names (`app`)
+- **Pipe Namespace**: All pipes use `\\.\pipe\{name}` format internally
+- **Simplified Naming**: File extensions are stripped to create clean pipe names
+- **Instance Management**: Uses single pipe instance to avoid resource conflicts
+
+#### Cross-Platform URL Examples
+- **Unix**: `ipc:///var/run/app/socket.sock` → `/var/run/app/socket.sock`
+- **Unix Relative**: `ipc://app.sock` → `/tmp/app.sock`
+- **Windows**: `ipc://C:\temp\app.pipe` → `\\.\pipe\app`
+- **Windows Simple**: `ipc://myapp` → `\\.\pipe\myapp`
+
 ### STDIO Transport Details
 
 The STDIO transport is specifically designed for subprocess communication where the broker launches client processes:

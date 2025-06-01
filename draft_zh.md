@@ -261,6 +261,30 @@
 - **WebSocket**：`ws://hostname:port/path`（例如 `ws://localhost:8080/ws`）
 - **STDIO**：`stdio://`（标准输入/输出管道）
 
+### IPC 路径处理
+
+IPC 传输实现了平台特定的路径处理以实现最佳的跨平台兼容性：
+
+#### Unix 域套接字
+- **路径格式**：`/path/to/socket.sock` 或相对路径
+- **默认目录**：相对路径使用 `/tmp`（例如 `socket.sock` → `/tmp/socket.sock`）
+- **目录创建**：仅在父目录不存在时自动创建
+- **路径保持**：绝对路径按原样使用，避免不必要的目录操作
+- **清理**：监听器关闭时移除套接字文件
+
+#### Windows 命名管道
+- **路径格式**：简单管道名或文件样式路径
+- **名称提取**：文件路径（例如 `C:\temp\app.pipe`）转换为管道名（`app`）
+- **管道命名空间**：所有管道内部使用 `\\.\pipe\{name}` 格式
+- **简化命名**：去除文件扩展名以创建简洁的管道名
+- **实例管理**：使用单个管道实例以避免资源冲突
+
+#### 跨平台 URL 示例
+- **Unix**：`ipc:///var/run/app/socket.sock` → `/var/run/app/socket.sock`
+- **Unix 相对**：`ipc://app.sock` → `/tmp/app.sock`
+- **Windows**：`ipc://C:\temp\app.pipe` → `\\.\pipe\app`
+- **Windows 简单**：`ipc://myapp` → `\\.\pipe\myapp`
+
 ### STDIO 传输详情
 
 STDIO 传输专门设计用于子进程通信，由代理启动客户端进程：
