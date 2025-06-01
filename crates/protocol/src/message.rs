@@ -1,16 +1,19 @@
 pub mod buffer;
 pub mod decode;
 pub mod encode;
+pub mod perf;
 pub mod traits;
 pub mod types;
 pub mod zerocopy;
 
 // Re-export core types for convenience
-// Re-export buffer management types
 pub use buffer::{
-    AlignedBuffer, BufferError, BufferManager, BufferMetrics, MappedBuffer, MessageAssembler,
-    RingBuffer,
+    AlignedBuffer, BufferError, BufferManager, BufferMetrics, MessageAssembler, RingBuffer,
 };
+// Re-export performance optimization types
+pub use encode::{MessageBuilderPool, PoolStats, PooledMessageBuilder};
+// Re-export performance utilities
+pub use perf::{CacheStats as MessageCacheStats, MessageCache, MessagePresets};
 // Re-export optimized processing types
 pub use traits::{
     HeaderAccess, Message, MessageDecode, MessageEncode, MessageValidate, OwnedMessage,
@@ -22,6 +25,4 @@ pub use types::{
     MessageDeserializeError, MessageEncodeError, MessageType, Reqrep, Routing, StatusCode,
 };
 // Re-export zero-copy types for high-performance scenarios
-pub use zerocopy::{
-    BorrowedMessage, HeaderField, MessageMetadata, StreamingEncoder, ZeroCopyDecode, ZeroCopyEncode,
-};
+pub use zerocopy::{BorrowedMessage, StreamingEncoder, ZeroCopyDecode, ZeroCopyEncode};

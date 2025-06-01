@@ -1,31 +1,17 @@
 // Core protocol implementation
 pub mod message;
 
-// Core implementation
-pub mod core;
-
-// Re-export core types and traits
-// Re-export specific implementations
-// Re-export zero-copy types for high-performance scenarios
+// Re-export core types and traits for convenience
 pub use message::{
-    // Buffer management types
+    // Buffer management for advanced use cases
     AlignedBuffer,
+    // Core message types
+    Auth,
+    // Zero-copy types for performance-critical scenarios
     BorrowedMessage,
-    BufferError,
     BufferManager,
     BufferMetrics,
-    // Optimized processing types
-    HeaderField,
-    MappedBuffer,
-    MessageAssembler,
-    MessageMetadata,
-    RingBuffer,
-    StreamingEncoder,
-    ZeroCopyDecode,
-    ZeroCopyEncode,
-};
-pub use message::{
-    Auth,
+    // Constants
     CLIENT_ID_BROKER,
     CLIENT_ID_MIN_ASSIGNED,
     CLIENT_ID_RESERVED,
@@ -33,22 +19,35 @@ pub use message::{
     DEFAULT_KEEPALIVE_INTERVAL,
     DEFAULT_KEEPALIVE_TIMEOUT_MULTIPLIER,
     Header,
+    // Core traits
     HeaderAccess,
     Keepalive,
-    // Traits from traits module
+    MessageAssembler,
+    // Performance optimization types
+    MessageBuilderPool,
+    MessageCache,
+    MessageCacheStats,
     MessageDecode,
+    // Error types
     MessageDeserializeError,
     MessageEncode,
     MessageEncodeError,
-    // Core types from types module
+    MessagePresets,
     MessageType,
     MessageValidate,
     OwnedMessage,
     PayloadAccess,
+    PoolStats,
+    PooledMessageBuilder,
     Reqrep,
+    RingBuffer,
     Routing,
     StatusCode,
+    StreamingEncoder,
+    ZeroCopyDecode,
+    ZeroCopyEncode,
 };
+// Re-export specific implementations
 pub use message::{decode::Message, encode::MessageBuilder};
 
 // Protocol version

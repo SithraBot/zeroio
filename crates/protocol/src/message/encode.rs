@@ -1,3 +1,9 @@
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
+
+use bytes::Bytes;
 use once_cell::sync::OnceCell;
 
 // Re-export core types for backward compatibility
@@ -21,6 +27,134 @@ pub struct MessageBuilder {
 const PROTOCOL_VERSION: u8 = 1;
 const RESERVED_SIZE: usize = 16;
 const BASE_HEADER_SIZE: usize = 34;
+
+/// Pool of reusable MessageBuilder instances for performance optimization
+pub struct MessageBuilderPool {
+    pool:     Arc<Mutex<VecDeque<MessageBuilder>>>,
+    max_size: usize,
+}
+
+impl MessageBuilderPool {
+    /// Create a new message builder pool
+    #[must_use]
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            pool: Arc::new(Mutex::new(VecDeque::with_capacity(max_size))),
+            max_size,
+        }
+    }
+
+    /// Get a builder from the pool or create a new one
+    #[must_use]
+    pub fn get_builder(&self, msg_type: MessageType, client_id: u32) -> PooledMessageBuilder {
+        let mut builder = self.pool.lock().map_or_else(
+            |_| MessageBuilder::new(msg_type, client_id),
+            |mut pool| pool.pop_front().unwrap_or_else(|| MessageBuilder::new(msg_type, client_id)),
+        );
+
+        // Reset the builder to the desired type and client_id
+        builder.msg_type = msg_type;
+        builder.client_id = client_id;
+        builder.header = Header::default();
+        builder.header_data = OnceCell::new();
+        builder.payload.clear();
+
+        PooledMessageBuilder {
+            builder,
+            pool: Arc::clone(&self.pool),
+            max_size: self.max_size,
+        }
+    }
+
+    /// Get pool statistics
+    #[must_use]
+    pub fn stats(&self) -> PoolStats {
+        self.pool.lock().map_or(
+            PoolStats {
+                size:     0,
+                capacity: self.max_size,
+            },
+            |pool| PoolStats {
+                size:     pool.len(),
+                capacity: self.max_size,
+            },
+        )
+    }
+}
+
+impl Default for MessageBuilderPool {
+    fn default() -> Self {
+        Self::new(50) // Default pool size
+    }
+}
+
+/// A pooled message builder that returns to the pool when dropped
+pub struct PooledMessageBuilder {
+    builder:  MessageBuilder,
+    pool:     Arc<Mutex<VecDeque<MessageBuilder>>>,
+    max_size: usize,
+}
+
+impl PooledMessageBuilder {
+    /// Build the message and return it
+    ///
+    /// # Errors
+    ///
+    /// Returns `MessageEncodeError` if encoding fails
+    pub fn build(self) -> Result<Bytes, MessageEncodeError> {
+        let vec = self.builder.build_vec()?;
+        Ok(Bytes::from(vec))
+    }
+}
+
+impl std::ops::Deref for PooledMessageBuilder {
+    type Target = MessageBuilder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
+}
+
+impl std::ops::DerefMut for PooledMessageBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.builder
+    }
+}
+
+impl Drop for PooledMessageBuilder {
+    fn drop(&mut self) {
+        // Return builder to pool if there's space
+        if let Ok(mut pool) = self.pool.lock() {
+            if pool.len() < self.max_size {
+                // Create a fresh builder to put back in the pool
+                let fresh_builder = MessageBuilder::new(MessageType::Join, 0);
+                pool.push_back(fresh_builder);
+            }
+        }
+    }
+}
+
+/// Pool statistics
+#[derive(Debug, Clone)]
+pub struct PoolStats {
+    /// Current number of builders in pool
+    pub size:     usize,
+    /// Maximum pool capacity
+    pub capacity: usize,
+}
+
+impl PoolStats {
+    /// Calculate pool utilization (0.0 to 1.0)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn utilization(&self) -> f64 {
+        if self.capacity > 0 {
+            self.size as f64 / self.capacity as f64
+        } else {
+            0.0
+        }
+    }
+}
 
 impl MessageBuilder {
     fn get_header_data(&self) -> Result<&Vec<u8>, MessageEncodeError> {

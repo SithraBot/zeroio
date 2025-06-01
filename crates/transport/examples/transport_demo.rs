@@ -1,15 +1,15 @@
-//! Example demonstrating transport usage
+//! Example demonstrating transport usage with connection tracking
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use zeroio_transport::{TransportManager, TransportStream};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create transport manager
-    let manager = TransportManager::new();
+    // Create transport manager with custom cache configuration
+    let manager = TransportManager::with_cache_config(50, std::time::Duration::from_secs(600));
 
-    println!("Transport Manager Demo");
-    println!("=====================");
+    println!("Transport Manager Demo with Connection Tracking");
+    println!("==============================================");
 
     // Example 1: TCP Transport
     println!("\n1. TCP Transport Example:");
@@ -23,10 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n3. STDIO Transport Example:");
     demo_stdio(&manager).await?;
 
-    // Example 4: Cache Statistics
-    println!("\n4. Cache Statistics:");
-    let stats = manager.cache_stats();
-    println!("   Cached connections: {}/{}", stats.size, stats.capacity);
+    // Example 4: Connection Statistics
+    println!("\n4. Connection Statistics:");
+    demo_stats(&manager);
+
+    println!("\nDemo completed!");
 
     Ok(())
 }
@@ -117,4 +118,27 @@ async fn demo_stdio(manager: &TransportManager) -> Result<(), Box<dyn std::error
     }
 
     Ok(())
+}
+
+fn demo_stats(manager: &TransportManager) {
+    let stats = manager.cache_stats();
+    println!(
+        "   Connection tracking entries: {}/{}",
+        stats.size, stats.capacity
+    );
+    println!("   Cache utilization: {:.1}%", stats.utilization() * 100.0);
+    println!("   Active entries: {}", stats.active_entries);
+    println!("   Active ratio: {:.1}%", stats.active_ratio() * 100.0);
+
+    // Demo connection frequency tracking
+    let test_urls = ["tcp://localhost:8080", "ipc:///tmp/zeroio_test.sock", "stdio://echo test"];
+
+    for url in &test_urls {
+        if let Some(frequency) = manager.get_connection_frequency(url) {
+            println!("   {} accessed {} times", url, frequency);
+            if manager.is_frequently_accessed(url) {
+                println!("     → Frequently accessed (good for connection pooling)");
+            }
+        }
+    }
 }

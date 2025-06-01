@@ -198,22 +198,19 @@ impl AlignedBuffer {
     /// # Errors
     ///
     /// Returns `BufferError::InsufficientSpace` if there is not enough space
-    /// in the buffer to write the requested data
     pub fn write(&mut self, data: &[u8]) -> Result<usize, BufferError> {
-        let available = self.capacity - self.len;
-        let to_write = data.len().min(available);
-
-        if to_write == 0 {
+        if self.len + data.len() > self.capacity {
             return Err(BufferError::InsufficientSpace);
         }
 
+        let start = self.len;
+        let end = start + data.len();
         unsafe {
-            let dst = self.ptr.as_ptr().add(self.len);
-            std::ptr::copy_nonoverlapping(data.as_ptr(), dst, to_write);
+            let dst = self.ptr.as_ptr().add(start);
+            std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
         }
-
-        self.len += to_write;
-        Ok(to_write)
+        self.len = end;
+        Ok(data.len())
     }
 }
 
@@ -228,7 +225,7 @@ impl Drop for AlignedBuffer {
 unsafe impl Send for AlignedBuffer {}
 unsafe impl Sync for AlignedBuffer {}
 
-/// Zero-copy message assembler for fragmented data
+/// Message assembler for handling fragmented messages
 pub struct MessageAssembler {
     fragments:     Vec<Bytes>,
     total_size:    usize,
@@ -242,6 +239,7 @@ impl Default for MessageAssembler {
 }
 
 impl MessageAssembler {
+    /// Create new message assembler
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -251,13 +249,13 @@ impl MessageAssembler {
         }
     }
 
-    /// Add fragment without copying
+    /// Add a message fragment
     pub fn add_fragment(&mut self, fragment: Bytes) {
         self.total_size += fragment.len();
         self.fragments.push(fragment);
     }
 
-    /// Set expected total size
+    /// Set expected total message size
     pub fn set_expected_size(&mut self, size: usize) {
         self.expected_size = Some(size);
     }
@@ -266,133 +264,87 @@ impl MessageAssembler {
     #[must_use]
     pub fn is_complete(&self) -> bool {
         self.expected_size.map_or_else(
-            || self.total_size >= 34 && self.check_protocol_complete(),
+            || self.check_protocol_complete(),
             |expected| self.total_size >= expected,
         )
     }
 
-    /// Assemble fragments into single buffer
+    /// Assemble fragments into complete message
     ///
     /// # Errors
     ///
-    /// Returns `BufferError::InvalidSize` if the assembled buffer would be
-    /// empty when fragments exist, or if buffer assembly fails due to
-    /// memory constraints
+    /// Returns `BufferError` if:
+    /// - No fragments have been added
+    /// - The assembled message is incomplete
+    /// - Memory allocation fails during assembly
     ///
     /// # Panics
     ///
-    /// May panic if internal fragment state is inconsistent
+    /// This function should not panic as it checks for empty fragments
     pub fn assemble(self) -> Result<Bytes, BufferError> {
         if self.fragments.is_empty() {
-            return Ok(Bytes::new());
+            return Err(BufferError::InvalidSize);
         }
 
         if self.fragments.len() == 1 {
-            // SAFETY: We just checked that fragments.len() == 1
-            return Ok(self
-                .fragments
-                .into_iter()
-                .next()
-                .unwrap_or_else(|| unreachable!("Fragment vector has exactly one element")));
+            // We know fragments has exactly one element since we checked above
+            let mut fragments = self.fragments;
+            return Ok(fragments.pop().unwrap_or_default());
         }
 
-        // Need to copy fragments into single buffer
-        let mut buffer = BytesMut::with_capacity(self.total_size);
+        let mut result = BytesMut::with_capacity(self.total_size);
         for fragment in self.fragments {
-            buffer.extend_from_slice(&fragment);
+            result.extend_from_slice(&fragment);
         }
 
-        Ok(buffer.freeze())
+        Ok(result.freeze())
     }
 
-    /// Check if we have a complete protocol message
+    /// Check if we have a complete protocol message based on header
     fn check_protocol_complete(&self) -> bool {
         if self.total_size < 34 {
+            // Need at least base header
             return false;
         }
 
-        // Create temporary view of first 34 bytes
-        let mut header_bytes = [0u8; 34];
-        let mut offset = 0;
+        // Assemble enough data to read header
+        let mut header_data = Vec::with_capacity(34);
+        let mut remaining = 34;
 
         for fragment in &self.fragments {
-            let to_copy = (34 - offset).min(fragment.len());
-            header_bytes[offset..offset + to_copy].copy_from_slice(&fragment[..to_copy]);
-            offset += to_copy;
-            if offset >= 34 {
+            if remaining == 0 {
                 break;
             }
+
+            let to_copy = remaining.min(fragment.len());
+            header_data.extend_from_slice(&fragment[..to_copy]);
+            remaining -= to_copy;
         }
 
+        if header_data.len() < 34 {
+            return false;
+        }
+
+        // Parse header length
         let header_len = u32::from_be_bytes([
-            header_bytes[22],
-            header_bytes[23],
-            header_bytes[24],
-            header_bytes[25],
+            header_data[22],
+            header_data[23],
+            header_data[24],
+            header_data[25],
         ]) as usize;
 
         let payload_len_offset = 26 + header_len;
-        let total_header_size = payload_len_offset + 8;
-
-        if self.total_size < total_header_size {
+        if self.total_size < payload_len_offset + 8 {
             return false;
         }
 
-        // Would need to read payload length, but this is a reasonable heuristic
+        // Need to read payload length - this is simplified
+        // In practice, you'd need to assemble more data
         true
     }
 }
 
-/// Memory-mapped buffer for large message processing (Currently Not Available)
-pub struct MappedBuffer {
-    // Retain fields for API compatibility, but they won't be used meaningfully.
-    _ptr: Option<NonNull<u8>>,
-    _len: usize,
-}
-
-impl MappedBuffer {
-    /// Create memory-mapped buffer from file (Currently Not Available)
-    ///
-    /// # Errors
-    ///
-    /// This function currently always returns `BufferError::MmapUnavailable`.
-    pub fn from_file(_path: &str) -> Result<Self, BufferError> {
-        Err(BufferError::MmapUnavailable)
-    }
-
-    /// Create anonymous memory mapping (Currently Not Available)
-    ///
-    /// # Errors
-    ///
-    /// This function currently always returns `BufferError::MmapUnavailable`.
-    pub fn anonymous(_size: usize) -> Result<Self, BufferError> {
-        Err(BufferError::MmapUnavailable)
-    }
-
-    /// Get buffer as slice (Currently Not Available)
-    #[must_use]
-    pub fn as_slice(&self) -> &[u8] {
-        // Returns an empty slice as the buffer is not functional.
-        &[]
-    }
-
-    /// Advise kernel about access pattern (Currently Not Available)
-    ///
-    /// # Errors
-    ///
-    /// This function currently always returns `BufferError::MmapUnavailable`.
-    pub fn advise_sequential(&self) -> Result<(), BufferError> {
-        Err(BufferError::MmapUnavailable)
-    }
-}
-
-impl Drop for MappedBuffer {
-    fn drop(&mut self) {
-        // No-op as the buffer is not functional.
-    }
-}
-
-/// Ring buffer for streaming message processing
+/// Ring buffer for streaming data
 pub struct RingBuffer {
     buffer:    Vec<u8>,
     read_pos:  usize,
@@ -401,21 +353,25 @@ pub struct RingBuffer {
 }
 
 impl RingBuffer {
-    /// Create a new ring buffer with the specified capacity
+    /// Create new ring buffer with specified capacity
     ///
     /// # Errors
     ///
-    /// Returns `BufferError` if the capacity is too large for memory allocation
+    /// Returns `BufferError::InvalidSize` if capacity is 0
     pub fn new(capacity: usize) -> Result<Self, BufferError> {
+        if capacity == 0 {
+            return Err(BufferError::InvalidSize);
+        }
+
         Ok(Self {
-            buffer:    vec![0u8; capacity],
+            buffer:    vec![0; capacity],
             read_pos:  0,
             write_pos: 0,
             full:      false,
         })
     }
 
-    /// Available space for writing
+    /// Get available space for writing
     #[must_use]
     pub fn available_write(&self) -> usize {
         if self.full {
@@ -427,7 +383,7 @@ impl RingBuffer {
         }
     }
 
-    /// Available data for reading
+    /// Get available data for reading
     #[must_use]
     pub fn available_read(&self) -> usize {
         if self.full {
@@ -443,37 +399,26 @@ impl RingBuffer {
     ///
     /// # Errors
     ///
-    /// Returns `BufferError` if the write operation fails due to buffer
-    /// constraints or if the data cannot be written to the underlying
-    /// buffer
+    /// Returns `BufferError::InsufficientSpace` if there is not enough space
     pub fn write(&mut self, data: &[u8]) -> Result<usize, BufferError> {
         let available = self.available_write();
-        let to_write = data.len().min(available);
-
-        if to_write == 0 {
-            return Ok(0);
+        if data.len() > available {
+            return Err(BufferError::InsufficientSpace);
         }
 
-        let buffer_len = self.buffer.len();
-        let end_space = buffer_len - self.write_pos;
+        let mut written = 0;
+        for &byte in data {
+            self.buffer[self.write_pos] = byte;
+            self.write_pos = (self.write_pos + 1) % self.buffer.len();
+            written += 1;
 
-        if to_write <= end_space {
-            // Single copy
-            self.buffer[self.write_pos..self.write_pos + to_write]
-                .copy_from_slice(&data[..to_write]);
-            self.write_pos = (self.write_pos + to_write) % buffer_len;
-        } else {
-            // Split copy
-            self.buffer[self.write_pos..].copy_from_slice(&data[..end_space]);
-            self.buffer[..to_write - end_space].copy_from_slice(&data[end_space..to_write]);
-            self.write_pos = to_write - end_space;
+            if self.write_pos == self.read_pos {
+                self.full = true;
+                break;
+            }
         }
 
-        if self.write_pos == self.read_pos {
-            self.full = true;
-        }
-
-        Ok(to_write)
+        Ok(written)
     }
 
     /// Read data from ring buffer
@@ -481,25 +426,15 @@ impl RingBuffer {
         let available = self.available_read();
         let to_read = output.len().min(available);
 
-        if to_read == 0 {
-            return 0;
+        for item in output.iter_mut().take(to_read) {
+            *item = self.buffer[self.read_pos];
+            self.read_pos = (self.read_pos + 1) % self.buffer.len();
         }
 
-        let buffer_len = self.buffer.len();
-        let end_space = buffer_len - self.read_pos;
-
-        if to_read <= end_space {
-            // Single copy
-            output[..to_read].copy_from_slice(&self.buffer[self.read_pos..self.read_pos + to_read]);
-            self.read_pos = (self.read_pos + to_read) % buffer_len;
-        } else {
-            // Split copy
-            output[..end_space].copy_from_slice(&self.buffer[self.read_pos..]);
-            output[end_space..to_read].copy_from_slice(&self.buffer[..to_read - end_space]);
-            self.read_pos = to_read - end_space;
+        if to_read > 0 {
+            self.full = false;
         }
 
-        self.full = false;
         to_read
     }
 }
@@ -516,19 +451,17 @@ pub struct BufferMetrics {
 }
 
 impl BufferMetrics {
+    /// Calculate pool hit ratio
+    #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn hit_ratio(&self) -> f64 {
-        let hits = self.pool_hits.load(Ordering::Relaxed);
-        let total = hits + self.pool_misses.load(Ordering::Relaxed);
-        if total == 0 {
-            0.0
-        } else {
-            hits as f64 / total as f64
-        }
+        let hits = self.pool_hits.load(Ordering::Relaxed) as f64;
+        let total = hits + self.pool_misses.load(Ordering::Relaxed) as f64;
+        if total > 0.0 { hits / total } else { 0.0 }
     }
 }
 
-/// Buffer management errors
+/// Buffer-related errors
 #[derive(Debug, thiserror::Error)]
 pub enum BufferError {
     #[error("Invalid alignment specified")]
@@ -539,18 +472,6 @@ pub enum BufferError {
     InsufficientSpace,
     #[error("Invalid size specified")]
     InvalidSize,
-    #[error("Invalid file path")]
-    InvalidPath,
-    #[error("Failed to open file")]
-    FileOpenFailed,
-    #[error("Failed to stat file")]
-    StatFailed,
-    #[error("Memory mapping failed")]
-    MmapFailed,
-    #[error("madvise system call failed")]
-    MadviseFailed,
-    #[error("Memory mapping functionality is unavailable on this platform or build.")]
-    MmapUnavailable,
 }
 
 #[cfg(test)]
@@ -559,10 +480,9 @@ mod tests {
 
     #[test]
     fn test_buffer_manager() {
-        let mut manager = BufferManager::new(64);
+        let mut manager = BufferManager::new(8);
         let buffer = manager.allocate(1024).unwrap();
         assert_eq!(buffer.capacity(), 1024);
-        manager.deallocate(buffer);
     }
 
     #[test]
@@ -570,20 +490,16 @@ mod tests {
         let mut assembler = MessageAssembler::new();
         assembler.add_fragment(Bytes::from("hello"));
         assembler.add_fragment(Bytes::from(" world"));
-
         let result = assembler.assemble().unwrap();
-        assert_eq!(result, "hello world");
+        assert_eq!(result, Bytes::from("hello world"));
     }
 
     #[test]
     fn test_ring_buffer() {
         let mut ring = RingBuffer::new(10).unwrap();
-        let written = ring.write(b"hello").unwrap();
-        assert_eq!(written, 5);
-
+        assert_eq!(ring.write(b"hello").unwrap(), 5);
         let mut output = [0u8; 10];
-        let read = ring.read(&mut output);
-        assert_eq!(read, 5);
+        assert_eq!(ring.read(&mut output), 5);
         assert_eq!(&output[..5], b"hello");
     }
 }

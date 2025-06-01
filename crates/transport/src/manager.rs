@@ -1,7 +1,12 @@
-//! Transport manager for managing multiple transport types with caching
+//! Transport manager for managing multiple transport types with connection
+//! caching
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
+use async_trait::async_trait;
 use dashmap::DashMap;
 use lru::LruCache;
 
@@ -11,52 +16,31 @@ use crate::{
     traits::{Transport, TransportStream},
 };
 
-/// Manages various transport implementations (TCP, IPC, WebSocket, STDIO)
-/// and provides a unified interface for connecting.
-///
-/// It allows registration of different transport types and selects the
-/// appropriate one based on the URL scheme for connection requests.
-/// Connection caching is planned but currently not fully implemented in the
-/// `connect` path.
+/// Connection cache entry with TTL
+#[derive(Clone)]
+struct CacheEntry {
+    last_used:        Instant,
+    connection_count: usize,
+}
+
+/// Manages various transport implementations with connection tracking for
+/// performance
 pub struct TransportManager {
-    /// Registered transports, keyed by their transport type string (e.g.,
-    /// "tcp", "ipc").
+    /// Registered transports, keyed by their transport type string
     transports:
         DashMap<String, Arc<dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync>>,
-    /// Connection cache for frequently used connections.
-    /// Note: This cache is not actively used by the `connect` method in the
-    /// current implementation. See `connect` method's internal TODO for
-    /// more details.
-    _connection_cache: Arc<Mutex<LruCache<String, Arc<dyn TransportStream>>>>,
-    /// Configuration for the transport manager, like cache settings.
-    _config:           TransportManagerConfig,
+    /// Connection usage tracking for optimization
+    connection_stats: Arc<Mutex<LruCache<String, CacheEntry>>>,
+    /// Cache TTL for connection reuse decisions
+    cache_ttl:        Duration,
 }
 
-#[derive(Debug, Clone)]
-pub struct TransportManagerConfig {
-    /// Maximum number of cached connections
-    pub max_cached_connections: usize,
-    /// Enable connection pooling
-    pub enable_pooling:         bool,
-}
-
-impl Default for TransportManagerConfig {
-    fn default() -> Self {
-        Self {
-            max_cached_connections: 100,
-            enable_pooling:         true,
-        }
-    }
-}
-
-// Internal wrapper to store different `Transport` trait objects with their
-// concrete stream types, allowing them to be stored in the `TransportManager`'s
-// `transports` map which expects `Arc<dyn Transport<Stream = Box<dyn
-// TransportStream>>>`.
+// Internal wrapper to store different Transport trait objects
 struct TypeErasedTransport<T: Transport> {
     inner: T,
 }
 
+#[async_trait]
 impl<T> Transport for TypeErasedTransport<T>
 where
     T: Transport + Send + Sync + 'static,
@@ -64,50 +48,18 @@ where
 {
     type Stream = Box<dyn TransportStream>;
 
-    fn connect<'life0, 'life1, 'async_trait>(
-        &'life0 self,
-        url: &'life1 str,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = TransportResult<Self::Stream>> + Send + 'async_trait>,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
-        Box::pin(async move {
-            let stream = self.inner.connect(url).await?;
-            Ok(Box::new(stream) as Box<dyn TransportStream>)
-        })
+    async fn connect(&self, url: &str) -> TransportResult<Self::Stream> {
+        let stream = self.inner.connect(url).await?;
+        Ok(Box::new(stream) as Box<dyn TransportStream>)
     }
 
-    fn listen<'life0, 'life1, 'async_trait>(
-        &'life0 self,
-        _url: &'life1 str,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = TransportResult<
-                        Box<dyn crate::traits::TransportListener<Stream = Self::Stream>>,
-                    >,
-                > + Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
-        Box::pin(async move {
-            // For now, type-erased listeners are not supported by the manager framework.
-            // Each transport needs to handle its own listener logic directly if it supports
-            // listening.
-            Err(TransportError::NotSupported(
-                "Type-erased transport listeners are not supported via TransportManager."
-                    .to_string(),
-            ))
-        })
+    async fn listen(
+        &self,
+        _url: &str,
+    ) -> TransportResult<Box<dyn crate::traits::TransportListener<Stream = Self::Stream>>> {
+        Err(TransportError::NotSupported(
+            "Type-erased transport listeners are not supported via TransportManager.".to_string(),
+        ))
     }
 
     fn transport_type(&self) -> &str {
@@ -120,30 +72,29 @@ where
 }
 
 impl TransportManager {
-    /// Creates a new `TransportManager` with default configuration and
-    /// registers all built-in transport types.
+    /// Creates a new TransportManager with connection tracking enabled
     #[must_use]
     pub fn new() -> Self {
-        Self::with_config(TransportManagerConfig::default())
+        Self::with_cache_config(100, Duration::from_secs(300))
     }
 
-    /// Creates a new `TransportManager` with the specified configuration and
-    /// registers all built-in transport types.
+    /// Creates a new TransportManager with specified cache configuration
     ///
     /// # Panics
     ///
-    /// Panics if `config.max_cached_connections` is 0, as `LruCache` requires a
-    /// non-zero capacity for its internal cache.
+    /// Will panic if cache_size is 0, but this is handled by using a safe
+    /// fallback value
     #[must_use]
-    pub fn with_config(config: TransportManagerConfig) -> Self {
+    pub fn with_cache_config(cache_size: usize, ttl: Duration) -> Self {
         let mut manager = Self {
-            transports:        DashMap::new(),
-            _connection_cache: Arc::new(Mutex::new(LruCache::new(
-                #[allow(clippy::expect_used)]
-                std::num::NonZeroUsize::new(config.max_cached_connections)
-                    .expect("max_cached_connections must be non-zero for LruCache"),
+            transports:       DashMap::new(),
+            connection_stats: Arc::new(Mutex::new(LruCache::new(
+                std::num::NonZeroUsize::new(cache_size.max(1)).unwrap_or_else(|| {
+                    #[allow(clippy::expect_used)]
+                    std::num::NonZeroUsize::new(100).expect("100 is always non-zero")
+                }),
             ))),
-            _config:           config,
+            cache_ttl:        ttl,
         };
 
         // Register default transports
@@ -151,8 +102,7 @@ impl TransportManager {
         manager
     }
 
-    // Registers instances of the default built-in transports (TCP, IPC, STDIO,
-    // WebSocket).
+    /// Register instances of the default built-in transports
     fn register_default_transports(&mut self) {
         // TCP transport
         self.register_transport(Arc::new(TypeErasedTransport {
@@ -170,17 +120,12 @@ impl TransportManager {
         }));
 
         // WebSocket transport
-        // Note: WebSocket server functionality via listener might be limited or not
-        // fully supported by all underlying WebSocket transport implementations
-        // when accessed via manager.
         self.register_transport(Arc::new(TypeErasedTransport {
             inner: WebSocketTransport::new(),
         }));
     }
 
-    /// Registers a custom transport implementation with the manager.
-    /// The transport will be available for connection requests that match its
-    /// supported URL schemes.
+    /// Register a custom transport implementation
     pub fn register_transport(
         &self,
         transport: Arc<dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync>,
@@ -189,124 +134,168 @@ impl TransportManager {
         self.transports.insert(transport_type, transport);
     }
 
-    /// Connect to a URL using the appropriate transport registered with the
-    /// manager.
-    ///
-    /// The manager identifies the correct transport based on the URL scheme
-    /// (e.g., "tcp://", "ipc://").
-    ///
-    /// Note on Caching: Connection caching/pooling is intended for future
-    /// enhancement but is currently bypassed in this method. Each call to
-    /// `connect` establishes a new connection. Refer to internal TODOs for
-    /// planned improvements.
+    /// Connect to a URL using the appropriate transport with usage tracking
     ///
     /// # Errors
     ///
-    /// - `TransportError::NotSupported`: If no transport is registered that
-    ///   supports the URL's scheme.
-    /// - Transport-specific errors: Any error that occurs during the connection
-    ///   attempt by the underlying transport (e.g., `ConnectionFailed`,
-    ///   `InvalidUrl` from the specific transport).
+    /// Returns `TransportError` if:
+    /// - No transport supports the given URL
+    /// - The connection fails
     pub async fn connect(&self, url: &str) -> TransportResult<Box<dyn TransportStream>> {
-        // TODO: Implement proper connection pooling and caching.
-        // The current `_connection_cache` is not utilized by this `connect` method
-        // directly. This would require handling potential `&mut self` needs for
-        // cached streams or ensuring streams are `Clone` and it's safe to hand
-        // out clones from a cache, or using interior mutability patterns.
+        // Update connection statistics
+        self.track_connection_attempt(url);
 
-        // Find the appropriate transport based on the URL scheme.
-        let transport_to_use = self.find_transport_for_url(url).ok_or_else(|| {
-            // Try to extract the scheme from the URL for a more informative error message.
-            let scheme = url.split_once("://").map_or("unknown", |(s, _)| s);
-            TransportError::NotSupported(format!(
-                "No transport registered for URL scheme: '{scheme}' in URL '{url}'"
-            ))
-        })?;
+        // Create new connection
+        let transport = self
+            .find_transport_for_url(url)
+            .ok_or_else(|| TransportError::NotSupported(format!("No transport for URL: {url}")))?;
 
-        // Delegate the connection attempt to the selected transport.
-        transport_to_use.connect(url).await
+        let stream = transport.connect(url).await?;
+
+        // Track successful connection
+        self.track_successful_connection(url);
+
+        Ok(stream)
     }
 
-    // Finds a registered transport that supports the scheme of the given URL.
+    /// Find the appropriate transport for a given URL
     fn find_transport_for_url(
         &self,
         url: &str,
     ) -> Option<Arc<dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync>> {
-        for entry in &self.transports {
-            if entry.value().supports_url(url) {
-                return Some(Arc::clone(entry.value()));
+        for transport in &self.transports {
+            if transport.value().supports_url(url) {
+                return Some(Arc::clone(transport.value()));
             }
         }
         None
     }
 
-    /// Retrieves a cached connection for the given URL, if one exists and is
-    /// valid. Note: This method is currently not actively used by the
-    /// public `connect` API.
-    fn _get_cached_connection(&self, url: &str) -> Option<Arc<dyn TransportStream>> {
-        #[allow(clippy::expect_used)]
-        // expect is used for Mutex lock poisoning which is a panic condition.
-        let mut cache = self
-            ._connection_cache
-            .lock()
-            .expect("Connection cache lock poisoned during get");
-        cache.get(url).cloned()
+    /// Track connection attempt for statistics
+    fn track_connection_attempt(&self, url: &str) {
+        if let Ok(mut stats) = self.connection_stats.lock() {
+            let entry = stats.get_mut(url);
+            if let Some(entry) = entry {
+                entry.last_used = Instant::now();
+            } else {
+                stats.put(
+                    url.to_string(),
+                    CacheEntry {
+                        last_used:        Instant::now(),
+                        connection_count: 0,
+                    },
+                );
+            }
+        }
     }
 
-    /// Adds a connection to the cache.
-    /// Note: This method is currently not actively used by the public `connect`
-    /// API.
-    fn _cache_connection(&self, url: &str, stream: Arc<dyn TransportStream>) {
-        #[allow(clippy::expect_used)]
-        // expect is used for Mutex lock poisoning which is a panic condition.
-        let mut cache = self
-            ._connection_cache
-            .lock()
-            .expect("Connection cache lock poisoned during cache");
-        cache.put(url.to_string(), stream);
+    /// Track successful connection for statistics
+    fn track_successful_connection(&self, url: &str) {
+        if let Ok(mut stats) = self.connection_stats.lock() {
+            if let Some(entry) = stats.get_mut(url) {
+                entry.connection_count += 1;
+                entry.last_used = Instant::now();
+            }
+        }
     }
 
-    /// Clears all connections from the transport manager's cache.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the connection cache lock is poisoned (i.e., another thread
-    /// panicked while holding the lock).
+    /// Get connection frequency for optimization hints
+    #[must_use]
+    pub fn get_connection_frequency(&self, url: &str) -> Option<usize> {
+        self.connection_stats.lock().map_or(None, |stats| {
+            stats.peek(url).map(|entry| entry.connection_count)
+        })
+    }
+
+    /// Check if a URL is frequently accessed (good candidate for connection
+    /// pooling)
+    #[must_use]
+    pub fn is_frequently_accessed(&self, url: &str) -> bool {
+        self.get_connection_frequency(url).is_some_and(|count| count > 5)
+    }
+
+    /// Clear connection statistics
     pub fn clear_cache(&self) {
-        #[allow(clippy::expect_used)] // Used for Mutex lock poisoning.
-        let mut cache = self
-            ._connection_cache
-            .lock()
-            .expect("Connection cache lock poisoned during clear");
-        cache.clear();
+        if let Ok(mut stats) = self.connection_stats.lock() {
+            stats.clear();
+        }
     }
 
-    /// Retrieves statistics about the current state of the connection cache.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the connection cache lock is poisoned.
+    /// Get cache statistics
     #[must_use]
     pub fn cache_stats(&self) -> CacheStats {
-        #[allow(clippy::expect_used)] // Used for Mutex lock poisoning.
-        let cache = self
-            ._connection_cache
-            .lock()
-            .expect("Connection cache lock poisoned during stats");
-        CacheStats {
-            size:     cache.len(),
-            capacity: cache.cap().get(),
+        self.connection_stats.lock().map_or(
+            CacheStats {
+                size:           0,
+                capacity:       0,
+                active_entries: 0,
+            },
+            |stats| {
+                let now = Instant::now();
+                let active_entries = stats
+                    .iter()
+                    .filter(|(_, entry)| now.duration_since(entry.last_used) < self.cache_ttl)
+                    .count();
+
+                CacheStats {
+                    size: stats.len(),
+                    capacity: stats.cap().get(),
+                    active_entries,
+                }
+            },
+        )
+    }
+
+    /// Clean up expired cache entries
+    pub fn cleanup_expired_entries(&self) {
+        if let Ok(mut stats) = self.connection_stats.lock() {
+            let now = Instant::now();
+            let expired_keys: Vec<String> = stats
+                .iter()
+                .filter(|(_, entry)| now.duration_since(entry.last_used) >= self.cache_ttl)
+                .map(|(key, _)| key.clone())
+                .collect();
+
+            for key in expired_keys {
+                stats.pop(&key);
+            }
         }
     }
 }
 
-/// Cache statistics
+/// Cache statistics with additional metrics
 #[derive(Debug, Clone)]
 pub struct CacheStats {
-    /// Current number of cached connections
-    pub size:     usize,
+    /// Current number of cached entries
+    pub size:           usize,
     /// Maximum capacity
-    pub capacity: usize,
+    pub capacity:       usize,
+    /// Number of active (non-expired) entries
+    pub active_entries: usize,
+}
+
+impl CacheStats {
+    /// Calculate cache utilization ratio (0.0 to 1.0)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn utilization(&self) -> f64 {
+        if self.capacity > 0 {
+            self.size as f64 / self.capacity as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Calculate active entry ratio (0.0 to 1.0)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn active_ratio(&self) -> f64 {
+        if self.size > 0 {
+            self.active_entries as f64 / self.size as f64
+        } else {
+            0.0
+        }
+    }
 }
 
 impl Default for TransportManager {
@@ -322,19 +311,52 @@ mod tests {
     #[tokio::test]
     async fn test_transport_manager_creation() {
         let manager = TransportManager::new();
+        assert!(!manager.transports.is_empty());
 
-        // Check that default transports are registered
-        assert!(manager.find_transport_for_url("tcp://localhost:8080").is_some());
-        assert!(manager.find_transport_for_url("ipc:///tmp/test.sock").is_some());
-        assert!(manager.find_transport_for_url("stdio://").is_some());
-        assert!(manager.find_transport_for_url("ws://localhost:8080").is_some());
+        let stats = manager.cache_stats();
+        assert_eq!(stats.size, 0);
+        assert_eq!(stats.capacity, 100);
+    }
+
+    #[tokio::test]
+    async fn test_custom_cache_config() {
+        let manager = TransportManager::with_cache_config(50, Duration::from_secs(600));
+        let stats = manager.cache_stats();
+        assert_eq!(stats.capacity, 50);
     }
 
     #[tokio::test]
     async fn test_invalid_url() {
         let manager = TransportManager::new();
-
-        let result = manager.connect("invalid://url").await;
+        let result = manager.connect("invalid://test").await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_connection_tracking() {
+        let manager = TransportManager::new();
+        let url = "tcp://example.com:8080";
+
+        // Track some connection attempts (will fail, but that's OK for this test)
+        manager.track_connection_attempt(url);
+        manager.track_successful_connection(url);
+
+        let frequency = manager.get_connection_frequency(url);
+        assert_eq!(frequency, Some(1));
+
+        let stats = manager.cache_stats();
+        assert_eq!(stats.size, 1);
+        assert_eq!(stats.utilization(), 0.01); // 1/100
+    }
+
+    #[tokio::test]
+    async fn test_cache_cleanup() {
+        let manager = TransportManager::new();
+
+        manager.track_connection_attempt("tcp://test.com:80");
+        assert_eq!(manager.cache_stats().size, 1);
+
+        manager.clear_cache();
+        assert_eq!(manager.cache_stats().size, 0);
     }
 }

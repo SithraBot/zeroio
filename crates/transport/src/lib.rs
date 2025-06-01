@@ -18,7 +18,7 @@ pub mod websocket;
 // Re-export main types
 pub use error::{TransportError, TransportResult};
 pub use ipc::{IpcConfig, IpcTransport};
-pub use manager::{CacheStats, TransportManager, TransportManagerConfig};
+pub use manager::{CacheStats, TransportManager};
 pub use stdio::StdioTransport;
 // Re-export transport implementations
 pub use tcp::{TcpConfig, TcpTransport};

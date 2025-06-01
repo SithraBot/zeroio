@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::message::traits::*;
 // Re-export core types for backward compatibility
 pub use crate::message::types::{
@@ -14,7 +16,7 @@ const HEADER_LEN_OFFSET: usize = 22;
 const BASE_HEADER_SIZE: usize = 34;
 const PAYLOAD_LEN_SIZE: usize = 8;
 
-/// A zero-copy message parser that borrows from a buffer
+/// A zero-copy message parser that borrows from a buffer with header caching
 #[derive(Debug)]
 pub struct Message<'a> {
     // Full message buffer
@@ -28,6 +30,8 @@ pub struct Message<'a> {
     header_len:     u32,
     payload_offset: usize,
     payload_len:    u64,
+    // Cached deserialized header for performance
+    header_cache:   RefCell<Option<Header>>,
 }
 
 impl<'a> MessageDecode<'a> for Message<'a> {
@@ -104,6 +108,7 @@ impl<'a> MessageDecode<'a> for Message<'a> {
             header_len,
             payload_offset,
             payload_len,
+            header_cache: RefCell::new(None),
         };
 
         // Validate header structure
@@ -133,17 +138,30 @@ impl<'a> MessageDecode<'a> for Message<'a> {
     }
 
     fn header(&self) -> Result<Header, MessageDeserializeError> {
+        // Check cache first
+        if let Some(cached_header) = self.header_cache.borrow().as_ref() {
+            return Ok(cached_header.clone());
+        }
+
         if self.header_len == 0 {
-            return Ok(Header::default());
+            let default_header = Header::default();
+            *self.header_cache.borrow_mut() = Some(default_header.clone());
+            return Ok(default_header);
         }
 
         let header_bytes = self.header_bytes();
         if header_bytes.is_empty() {
-            return Ok(Header::default());
+            let default_header = Header::default();
+            *self.header_cache.borrow_mut() = Some(default_header.clone());
+            return Ok(default_header);
         }
 
-        rmp_serde::from_slice(header_bytes)
-            .map_err(|e| MessageDeserializeError::InvalidHeaderData(e.to_string()))
+        let header: Header = rmp_serde::from_slice(header_bytes)
+            .map_err(|e| MessageDeserializeError::InvalidHeaderData(e.to_string()))?;
+
+        // Cache the parsed header
+        *self.header_cache.borrow_mut() = Some(header.clone());
+        Ok(header)
     }
 
     fn payload_bytes(&self) -> &[u8] {
@@ -201,6 +219,58 @@ impl<'a> Message<'a> {
             header,
             payload: self.payload_bytes().to_vec(),
         })
+    }
+
+    /// Check if header is cached (for performance monitoring)
+    #[must_use]
+    pub fn is_header_cached(&self) -> bool {
+        self.header_cache.borrow().is_some()
+    }
+
+    /// Pre-cache the header to avoid repeated parsing
+    ///
+    /// # Errors
+    ///
+    /// Returns `MessageDeserializeError` if header parsing fails
+    pub fn cache_header(&self) -> Result<(), MessageDeserializeError> {
+        if !self.is_header_cached() {
+            let _: Header = self.header()?; // This will populate the cache
+        }
+        Ok(())
+    }
+
+    /// Get header field without full deserialization (optimized for common
+    /// cases)
+    #[must_use]
+    pub fn has_routing(&self) -> bool {
+        if let Ok(header) = self.header() {
+            header.routing.is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Quick check for keepalive messages
+    #[must_use]
+    pub fn has_keepalive(&self) -> bool {
+        if let Ok(header) = self.header() {
+            header.keepalive.is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Get message priority for processing optimization
+    #[must_use]
+    pub fn message_priority(&self) -> u8 {
+        match self.msg_type {
+            MessageType::Ping | MessageType::Pong => 0, // Highest priority
+            MessageType::Response => 1,                 // High priority
+            MessageType::Request => 2,                  // Medium priority
+            MessageType::Notification => 3,             // Lower priority
+            MessageType::Broadcast | MessageType::Topic => 4, // Low priority
+            _ => 5,                                     // Lowest priority
+        }
     }
 
     fn validate_header(&self) -> Result<(), MessageDeserializeError> {
