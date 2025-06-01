@@ -1361,6 +1361,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroio-server"
+version = "0.1.0"
+
+[[package]]
 name = "zeroio-transport"
 version = "0.1.0"
 dependencies = [

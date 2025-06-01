@@ -160,8 +160,6 @@ _示例: "news_updates"_
 
 `Payload` 字段承载消息的主要数据。它是一个使用 MessagePack 编码的可变长度字节序列。负载内部数据的结构和解释由应用程序定义。基础格式中的 `PayloadLength` 字段指定此负载数据的大小（字节）。如果消息没有主要数据要传递，`PayloadLength` 可以为零，此时 `Payload` 字段为空。
 
-- **204 No Content**: 请求成功完成，但负载中没有数据可返回。(PayloadLength 将为 0)。
-
 ## 3. 消息类型与通信模式
 
 ### 3.1. 消息类型概览
