@@ -25,7 +25,7 @@ fleximq is a modern, high-performance communication library designed for distrib
 
 ## Protocol
 
-See [draft.md](draft.md) for complete protocol specification.
+See [draft.md](https://github.com/fleximq/spec) for complete protocol specification.
 
 ## Contributing
 

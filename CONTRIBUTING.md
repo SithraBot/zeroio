@@ -48,9 +48,11 @@ The project uses custom clippy and rustfmt configurations for consistency.
 
 ### Protocol Changes
 
-- Maintain backward compatibility
-- Update `draft.md` specification
-- Consider cross-language implications
+- All protocol changes must be discussed and approved via the [RFC process](https://github.com/fleximq/rfcs).
+- Approved RFCs will lead to updates in the [protocol draft](https://github.com/fleximq/spec).
+- The draft becomes a formal specification after being supported by mainstream implementations.
+- Maintain backward compatibility.
+- Consider cross-language implications.
 
 ## Submitting Changes
 
