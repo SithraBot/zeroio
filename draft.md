@@ -36,8 +36,6 @@ to provide a versatile, programming language-agnostic, and cross-platform messag
 
 **Total base header size: 34 bytes** (1 byte Version + 1 byte Type + 4 bytes ClientID + 16 bytes Reserved + 4 bytes HeaderLength + 8 bytes PayloadLength).
 
-_Note: The original document stated "26 + 8 for payload length". Clarified to sum all fixed-size fields before the variable Header part._
-
 ### 2.2. Header
 
 #### 2.2.1. General Structure
@@ -156,15 +154,11 @@ Keep-alive Object:
 | PING         | keepalive       | -               | routing, reqrep, topic, status, auth      |
 | PONG         | keepalive       | -               | routing, reqrep, topic, status, auth      |
 
-_Note: Added `status` to forbidden fields for JOIN, as it's not relevant there._
-
 ### 2.3. Payload
 
 #### 2.3.1. General Description
 
 The `Payload` field carries the primary data of the message. It is a variable-length sequence of bytes encoded using MessagePack. The structure and interpretation of the data within the payload are application-defined. The `PayloadLength` field in the Base Format specifies the size of this payload data in bytes. If a message has no primary data to convey, the `PayloadLength` can be zero, and the `Payload` field will be empty.
-
-_(This subsection is new, providing explicit clarification on the payload.)_
 
 ## 3. Message Types and Communication Patterns
 
@@ -182,8 +176,6 @@ _(This subsection is new, providing explicit clarification on the payload.)_
 | UNSUB | Unsubscribe  | 7     | Unsubscribe from a topic                | `topic`                          |
 | PING  | Ping         | 8     | Connection keep-alive ping              | `keepalive`                      |
 | PONG  | Pong         | 9     | Connection keep-alive pong              | `keepalive`                      |
-
-_(Added a "Relevant Header Fields" column for quick reference, simplified from the detailed requirements table)_
 
 ### 3.2. Connection Establishment (JOIN)
 
@@ -477,8 +469,6 @@ _(Example: This could be a REQ message, Type=0x01)_
     - Connections can be terminated due to errors, timeouts (including keep-alive failures), or network issues.
     - Implementations should handle abrupt disconnections gracefully.
 
-_(Moved "Connection Flow" here and expanded it based on the handshake details)_
-
 ## 5. Data Representation Details
 
 ### 5.1. Status Codes
@@ -492,8 +482,6 @@ The protocol uses HTTP-like status codes within the optional `status` field in t
 - **202 Accepted**: Request accepted for processing, but processing is not yet complete (e.g., for asynchronous operations).
 - **204 No Content**: Request completed successfully, but there is no data to return in the payload. (PayloadLength would be 0).
 
-_(Added 204 No Content as it's common)_
-
 #### 5.1.2. Client Error Codes (400-499)
 
 - **400 Bad Request**: The request was malformed, contained invalid syntax, or included invalid parameters in the header or payload.
@@ -505,8 +493,6 @@ _(Added 204 No Content as it's common)_
 - **409 Conflict**: The request could not be completed due to a conflict with the current state of the target resource.
 - **413 Payload Too Large**: The request payload is larger than the server is willing or able to process.
 - **429 Too Many Requests**: The user has sent too many requests in a given amount of time ("rate limiting").
-
-_(Added 409, 413, 429 as common client errors)_
 
 #### 5.1.3. Server Error Codes (500-599)
 
@@ -526,8 +512,6 @@ These codes are defined by this protocol for conditions not covered by standard 
 - **603 Subscription Failed**: The broker failed to process a SUB request for reasons other than Topic Not Found (e.g., client exceeded subscription limit, authorization failed for the topic).
 - **604 Authentication Failed**: General authentication failure not covered by 401 (e.g. malformed auth object, unsupported auth type).
 - **605 Join Rejected**: The JOIN request was rejected by the broker for reasons other than authentication (e.g., broker at max capacity, client IP banned).
-
-_(Added 604, 605 for more specific protocol errors)_
 
 ### 5.2. Authentication Types
 
@@ -663,8 +647,6 @@ To ensure stability and prevent resource exhaustion, implementations should defi
 - **Minimum Message Size**: 34 bytes. This corresponds to a message with an empty Header (`HeaderLength` = 0) and an empty Payload (`PayloadLength` = 0).
 - **Typical Keep-alive Message Size (PING/PONG)**: Approximately 50-70 bytes, depending on the MessagePack encoding of the `keepalive` object. E.g., Base Header (34 bytes) + HeaderLength (4 bytes) + typical `keepalive` object (e.g., ~15-30 bytes for `{"keepalive":{"timestamp":1234567890123,"interval":30}}`).
 
-_Refined keep-alive message size calculation example._
-
 ### 7.2. Message Size Calculation Examples
 
 **1. JOIN Message with Token Authentication:**
@@ -690,8 +672,6 @@ _Refined keep-alive message size calculation example._
   - Let `PayloadSize` be the size of the MessagePack encoded payload.
   - `PayloadLength` field in Base Header = `PayloadSize`.
 - **Total Estimated Message Size**: 34 bytes (Base) + 100 bytes (Header) + `PayloadSize` = **~134 bytes + PayloadSize**.
-
-_Refined and detailed the examples._
 
 ### 7.3. General Protocol Rules
 
