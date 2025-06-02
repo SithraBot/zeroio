@@ -33,7 +33,9 @@ impl PlatformListener {
             .max_instances(1)
             .create(&self.pipe_name)
             .map_err(|e| {
-                TransportError::ConnectionFailed(format!("Failed to create new pipe instance: {e}"))
+                TransportError::ConnectionFailure(format!(
+                    "Failed to create new pipe instance: {e}"
+                ))
             })?;
 
         // Replace our server with the new one for future accepts
@@ -41,7 +43,7 @@ impl PlatformListener {
 
         // Create a client connection to communicate with the connected client
         let client = ClientOptions::new().open(&self.pipe_name).map_err(|e| {
-            TransportError::ConnectionFailed(format!("Failed to create client stream: {e}"))
+            TransportError::ConnectionFailure(format!("Failed to create client stream: {e}"))
         })?;
 
         Ok(client)
@@ -57,7 +59,7 @@ impl PlatformListener {
 pub async fn connect(path: &Path, _config: &IpcConfig) -> TransportResult<PlatformStream> {
     let pipe_name = format_pipe_name(path);
     ClientOptions::new().open(&pipe_name).map_err(|e| {
-        TransportError::ConnectionFailed(format!("Failed to connect to {pipe_name}: {e}"))
+        TransportError::ConnectionFailure(format!("Failed to connect to {pipe_name}: {e}"))
     })
 }
 
@@ -73,7 +75,7 @@ pub async fn listen(path: &Path, config: &IpcConfig) -> TransportResult<Platform
         .max_instances(1)
         .create(&pipe_name)
         .map_err(|e| {
-            TransportError::ConnectionFailed(format!(
+            TransportError::ConnectionFailure(format!(
                 "Failed to create named pipe {pipe_name}: {e}"
             ))
         })?;
