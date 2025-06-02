@@ -1,7 +1,7 @@
 //! Example demonstrating transport usage with connection tracking
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use fleximq_transport::{TransportManager, TransportStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
