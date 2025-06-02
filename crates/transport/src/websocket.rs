@@ -15,7 +15,7 @@ use url::Url;
 
 use crate::{
     error::{TransportError, TransportResult},
-    traits::{ConnectionInfo, Transport, TransportListener, TransportStream},
+    traits::{ConnectionInfo, ConnectionTimeouts, Transport, TransportListener, TransportStream},
 };
 
 /// WebSocket transport implementation
@@ -85,8 +85,9 @@ impl WebSocketTransport {
 
 /// A stream representing an active WebSocket connection.
 pub struct WebSocketTransportStream {
-    stream: WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
-    info:   ConnectionInfo,
+    stream:   WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
+    info:     ConnectionInfo,
+    timeouts: ConnectionTimeouts,
 }
 
 impl WebSocketTransportStream {
@@ -96,9 +97,14 @@ impl WebSocketTransportStream {
             local_addr:     Some(url.to_string()),
             remote_addr:    None,
             metadata:       std::collections::HashMap::new(),
+            established_at: std::time::Instant::now(),
         };
 
-        Self { stream, info }
+        Self {
+            stream,
+            info,
+            timeouts: ConnectionTimeouts::default(),
+        }
     }
 }
 
@@ -106,6 +112,10 @@ impl WebSocketTransportStream {
 impl TransportStream for WebSocketTransportStream {
     fn connection_info(&self) -> &ConnectionInfo {
         &self.info
+    }
+
+    fn timeouts(&self) -> ConnectionTimeouts {
+        self.timeouts
     }
 
     /// Checks if the WebSocket connection is considered active.
@@ -199,7 +209,7 @@ impl TransportListener for WebSocketTransportListener {
     /// Currently, this method is not supported for WebSocket listeners and will
     /// return `TransportError::NotSupported`.
     async fn accept(&mut self) -> TransportResult<Self::Stream> {
-        Err(TransportError::NotSupported(
+        Err(TransportError::UnsupportedTransport(
             "WebSocket server functionality is not implemented in this listener. Use connect for \
              client-side connections."
                 .to_string(),
@@ -234,14 +244,14 @@ impl Transport for WebSocketTransport {
     /// # Errors
     ///
     /// Returns `TransportError::InvalidUrl` if the URL is malformed or uses an
-    /// unsupported scheme. Returns `TransportError::ConnectionFailed` if
+    /// unsupported scheme. Returns `TransportError::ConnectionFailure` if
     /// the connection attempt fails.
     async fn connect(&self, url: &str) -> TransportResult<Self::Stream> {
         let parsed_url = Self::parse_url(url)?;
 
         let ws_url = parsed_url.as_str();
         let (ws_stream, _) = connect_async(ws_url).await.map_err(|e| {
-            TransportError::ConnectionFailed(format!(
+            TransportError::ConnectionFailure(format!(
                 "WebSocket connection to '{ws_url}' failed: {e}"
             ))
         })?;
@@ -478,7 +488,7 @@ mod tests {
         assert!(matches!(result, Err(TransportError::InvalidUrl(_))));
 
         let result = transport.connect("ws://nonexistent-domain-for-test.example.com:8080").await;
-        assert!(matches!(result, Err(TransportError::ConnectionFailed(_))));
+        assert!(matches!(result, Err(TransportError::ConnectionFailure(_))));
     }
 
     #[tokio::test]
@@ -508,7 +518,7 @@ mod tests {
                 // println!("Received: {:?}", &buf[..n]);
                 stream.close().await.expect("Failed to close stream");
             }
-            Err(TransportError::ConnectionFailed(e)) => {
+            Err(TransportError::ConnectionFailure(e)) => {
                 println!("Connection failed to wss://echo.websocket.org: {}", e);
             }
             Err(TransportError::InvalidUrl(e)) => {

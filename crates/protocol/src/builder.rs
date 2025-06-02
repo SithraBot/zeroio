@@ -31,14 +31,14 @@ impl MessageBuilder {
         }
     }
 
-    /// Add routing information
+    /// Set routing information
     #[must_use]
     pub fn routing(mut self, routing: Vec<Routing>) -> Self {
         self.header.routing = Some(routing);
         self
     }
 
-    /// Add a single routing target
+    /// Set a single routing target
     #[must_use]
     pub fn route_to(mut self, client_id: ClientId, path: impl Into<String>) -> Self {
         let routing = vec![Routing {
@@ -49,7 +49,7 @@ impl MessageBuilder {
         self
     }
 
-    /// Add multiple routing targets
+    /// Set multiple routing targets
     #[must_use]
     pub fn route_to_many<I, S>(mut self, targets: I) -> Self
     where
@@ -67,7 +67,7 @@ impl MessageBuilder {
         self
     }
 
-    /// Add request/response correlation
+    /// Set request/response correlation
     #[must_use]
     pub fn reqrep(mut self, reqrep: RequestResponse) -> Self {
         self.header.reqrep = Some(reqrep);
@@ -108,56 +108,56 @@ impl MessageBuilder {
         self
     }
 
-    /// Add authentication
+    /// Set authentication
     #[must_use]
     pub fn auth(mut self, auth: Auth) -> Self {
         self.header.auth = Some(auth);
         self
     }
 
-    /// Add token authentication
+    /// Set token authentication
     #[must_use]
     pub fn auth_token(mut self, token: impl Into<String>) -> Self {
         self.header.auth = Some(Auth::token(token));
         self
     }
 
-    /// Add basic authentication
+    /// Set basic authentication
     #[must_use]
     pub fn auth_basic(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
         self.header.auth = Some(Auth::basic(username, password));
         self
     }
 
-    /// Add API key authentication
+    /// Set API key authentication
     #[must_use]
     pub fn auth_api_key(mut self, api_key: impl Into<String>) -> Self {
         self.header.auth = Some(Auth::api_key(api_key));
         self
     }
 
-    /// Add keep-alive information
+    /// Set keep-alive information
     #[must_use]
     pub fn keepalive(mut self, keepalive: KeepAlive) -> Self {
         self.header.keepalive = Some(keepalive);
         self
     }
 
-    /// Add keep-alive with current timestamp
+    /// Set keep-alive with current timestamp
     #[must_use]
     pub fn ping(mut self) -> Self {
         self.header.keepalive = Some(KeepAlive::new());
         self
     }
 
-    /// Add keep-alive with current timestamp and interval
+    /// Set keep-alive with current timestamp and interval
     #[must_use]
     pub fn ping_with_interval(mut self, interval_seconds: u32) -> Self {
         self.header.keepalive = Some(KeepAlive::with_interval(interval_seconds));
         self
     }
 
-    /// Add keep-alive for PONG response
+    /// Set keep-alive for PONG response
     #[must_use]
     pub fn pong(mut self, ping_timestamp: u64) -> Self {
         self.header.keepalive = Some(KeepAlive {

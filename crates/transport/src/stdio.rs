@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     process::Stdio,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -15,7 +16,7 @@ use tokio::{
 
 use crate::{
     error::{TransportError, TransportResult},
-    traits::{ConnectionInfo, Transport, TransportListener, TransportStream},
+    traits::{ConnectionInfo, ConnectionTimeouts, Transport, TransportListener, TransportStream},
 };
 
 /// STDIO transport implementation
@@ -77,10 +78,11 @@ impl StdioTransport {
 /// A stream representing communication with a subprocess via its standard input
 /// and output.
 pub struct StdioTransportStream {
-    stdin:  ChildStdin,
-    stdout: ChildStdout,
-    child:  Child,
-    info:   ConnectionInfo,
+    stdin:    ChildStdin,
+    stdout:   ChildStdout,
+    child:    Child,
+    info:     ConnectionInfo,
+    timeouts: ConnectionTimeouts,
 }
 
 impl StdioTransportStream {
@@ -89,11 +91,11 @@ impl StdioTransportStream {
         let stdin = child
             .stdin
             .take()
-            .ok_or_else(|| TransportError::ConnectionFailed("Failed to get stdin".to_string()))?;
+            .ok_or_else(|| TransportError::ConnectionFailure("Failed to get stdin".to_string()))?;
         let stdout = child
             .stdout
             .take()
-            .ok_or_else(|| TransportError::ConnectionFailed("Failed to get stdout".to_string()))?;
+            .ok_or_else(|| TransportError::ConnectionFailure("Failed to get stdout".to_string()))?;
 
         let pid = child.id().unwrap_or(0);
         let info = ConnectionInfo {
@@ -101,6 +103,14 @@ impl StdioTransportStream {
             local_addr:     Some(format!("stdio://process/{pid}")),
             remote_addr:    Some(command.to_string()),
             metadata:       std::collections::HashMap::new(),
+            established_at: std::time::Instant::now(),
+        };
+
+        // Use default timeouts for stdio transport
+        let timeouts = ConnectionTimeouts {
+            connect_timeout: Some(Duration::from_secs(30)), // Default connect timeout
+            read_timeout:    Some(Duration::from_secs(30)), // Default read timeout
+            write_timeout:   Some(Duration::from_secs(30)), // Default write timeout
         };
 
         Ok(Self {
@@ -108,6 +118,7 @@ impl StdioTransportStream {
             stdout,
             child,
             info,
+            timeouts,
         })
     }
 
@@ -121,6 +132,10 @@ impl StdioTransportStream {
 impl TransportStream for StdioTransportStream {
     fn connection_info(&self) -> &ConnectionInfo {
         &self.info
+    }
+
+    fn timeouts(&self) -> ConnectionTimeouts {
+        self.timeouts
     }
 
     /// Checks if the STDIO stream is considered active.
@@ -151,7 +166,7 @@ impl TransportStream for StdioTransportStream {
         // Wait for child to exit gracefully, with a timeout.
         match tokio::time::timeout(std::time::Duration::from_secs(5), self.child.wait()).await {
             Ok(Ok(_exit_status)) => Ok(()), // Process exited gracefully.
-            Ok(Err(e)) => Err(TransportError::Io(e)), // Error waiting for process.
+            Ok(Err(e)) => Err(TransportError::Io(e.to_string())), // Error waiting for process.
             Err(_) => {
                 // Timeout reached, forcefully kill the process.
                 self.child.kill().await?;
@@ -205,7 +220,7 @@ impl TransportListener for StdioTransportListener {
     /// This is not supported for STDIO transport and will always return
     /// `TransportError::NotSupported`.
     async fn accept(&mut self) -> TransportResult<Self::Stream> {
-        Err(TransportError::NotSupported(
+        Err(TransportError::UnsupportedTransport(
             "STDIO transport does not support listening for incoming connections.".to_string(),
         ))
     }
@@ -214,7 +229,7 @@ impl TransportListener for StdioTransportListener {
     /// This is not applicable/supported for STDIO listeners and will always
     /// return `TransportError::NotSupported`.
     fn local_addr(&self) -> TransportResult<String> {
-        Err(TransportError::NotSupported(
+        Err(TransportError::UnsupportedTransport(
             "Local address is not applicable for STDIO listeners.".to_string(),
         ))
     }
@@ -249,9 +264,9 @@ impl Transport for StdioTransport {
     ///
     /// Returns `TransportError::InvalidUrl` if the URL format is invalid or no
     /// command can be determined.
-    /// Returns `TransportError::ConnectionFailed` if the subprocess fails to
+    /// Returns `TransportError::ConnectionFailure` if the subprocess fails to
     /// spawn (e.g., command not found, permissions).
-    /// Returns `TransportError::ConnectionFailed` if the stdin/stdout handles
+    /// Returns `TransportError::ConnectionFailure` if the stdin/stdout handles
     /// cannot be obtained from the child process.
     async fn connect(&self, url: &str) -> TransportResult<Self::Stream> {
         // Parse the URL to determine the command and arguments.
@@ -306,7 +321,7 @@ impl Transport for StdioTransport {
 
         // Spawn the child process.
         let child = cmd.spawn().map_err(|e| {
-            TransportError::ConnectionFailed(format!(
+            TransportError::ConnectionFailure(format!(
                 "Failed to spawn subprocess '{command_to_run}': {e:?}"
             ))
         })?;
@@ -321,12 +336,12 @@ impl Transport for StdioTransport {
     ///
     /// # Errors
     ///
-    /// Always returns `TransportError::NotSupported`.
+    /// Always returns `TransportError::UnsupportedTransport`.
     async fn listen(
         &self,
         _url: &str, // The URL is ignored as listening is not supported.
     ) -> TransportResult<Box<dyn TransportListener<Stream = Self::Stream>>> {
-        Err(TransportError::NotSupported(
+        Err(TransportError::UnsupportedTransport(
             "STDIO transport does not support listening (it is client-initiated only).".to_string(),
         ))
     }

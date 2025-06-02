@@ -4,10 +4,16 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+# Protocol
+fleximq-protocol = { path = "../protocol" }
 
 # Async runtime
 tokio.workspace = true
+tokio-util.workspace = true
 async-trait.workspace = true
+
+# Logging
+log = "0.4"
 
 # Error handling
 thiserror.workspace = true

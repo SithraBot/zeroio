@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::{
     error::{TransportError, TransportResult},
-    traits::{ConnectionInfo, Transport, TransportListener, TransportStream},
+    traits::{ConnectionInfo, ConnectionTimeouts, Transport, TransportListener, TransportStream},
 };
 
 // Platform-specific modules
@@ -116,9 +116,11 @@ impl IpcTransport {
 }
 
 /// A unified stream wrapper for IPC connections
+#[derive(Debug)]
 pub struct IpcTransportStream {
-    inner: PlatformStream,
-    info:  ConnectionInfo,
+    inner:    PlatformStream,
+    info:     ConnectionInfo,
+    timeouts: ConnectionTimeouts,
 }
 
 impl IpcTransportStream {
@@ -128,9 +130,14 @@ impl IpcTransportStream {
             local_addr:     Some(path.to_string_lossy().to_string()),
             remote_addr:    None,
             metadata:       std::collections::HashMap::new(),
+            established_at: std::time::Instant::now(),
         };
 
-        Self { inner, info }
+        Self {
+            inner,
+            info,
+            timeouts: ConnectionTimeouts::default(),
+        }
     }
 }
 
@@ -143,6 +150,10 @@ impl TransportStream for IpcTransportStream {
     fn is_connected(&self) -> bool {
         // For IPC, we consider it connected if the struct exists
         true
+    }
+
+    fn timeouts(&self) -> ConnectionTimeouts {
+        self.timeouts
     }
 
     async fn close(&mut self) -> TransportResult<()> {
@@ -509,7 +520,7 @@ mod tests {
         // Adding a timestamp or a counter could make it more unique if needed.
         let non_existent_socket = "ipc:///tmp/non_existent_socket_for_fleximq_test.sock";
         let result = transport.connect(non_existent_socket).await;
-        assert!(matches!(result, Err(TransportError::ConnectionFailed(_))));
+        assert!(matches!(result, Err(TransportError::ConnectionFailure(_))));
     }
 
     #[tokio::test]

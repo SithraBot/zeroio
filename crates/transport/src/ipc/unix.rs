@@ -39,7 +39,7 @@ impl PlatformListener {
 /// Connect to a Unix domain socket
 pub async fn connect(path: &Path) -> TransportResult<PlatformStream> {
     UnixStream::connect(path).await.map_err(|e| {
-        TransportError::ConnectionFailed(format!("Failed to connect to {}: {}", path.display(), e))
+        TransportError::ConnectionFailure(format!("Failed to connect to {}: {}", path.display(), e))
     })
 }
 
@@ -59,7 +59,7 @@ pub async fn listen(path: &Path) -> TransportResult<PlatformListener> {
     }
 
     let listener = UnixListener::bind(path).map_err(|e| {
-        TransportError::ConnectionFailed(format!("Failed to bind to {}: {}", path.display(), e))
+        TransportError::ConnectionFailure(format!("Failed to bind to {}: {}", path.display(), e))
     })?;
 
     Ok(PlatformListener { listener })

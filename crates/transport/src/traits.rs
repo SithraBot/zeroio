@@ -1,9 +1,15 @@
 //! Core transport traits
+//!
+//! This module defines the core traits and interfaces for the transport layer.
+//! The transport layer provides a unified API for different transport
+//! mechanisms (TCP, IPC, WebSocket, STDIO) with a focus on performance, memory
+//! efficiency, and proper async handling.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use fleximq_protocol::message::Message;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::error::TransportResult;
@@ -19,9 +25,11 @@ pub struct ConnectionInfo {
     pub remote_addr:    Option<String>,
     /// Connection metadata
     pub metadata:       std::collections::HashMap<String, String>,
+    /// Connection established timestamp
+    pub established_at: std::time::Instant,
 }
 
-/// Trait for transport streams that can send/receive data
+/// Trait for low-level transport streams that can send/receive raw data
 #[async_trait]
 pub trait TransportStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {
     /// Get connection information
@@ -32,6 +40,30 @@ pub trait TransportStream: AsyncRead + AsyncWrite + Send + Sync + Unpin {
 
     /// Close the connection gracefully
     async fn close(&mut self) -> TransportResult<()>;
+
+    /// Get connection timeout settings
+    fn timeouts(&self) -> ConnectionTimeouts;
+}
+
+/// Connection timeout settings
+#[derive(Debug, Clone, Copy)]
+pub struct ConnectionTimeouts {
+    /// Read timeout
+    pub read_timeout:    Option<Duration>,
+    /// Write timeout
+    pub write_timeout:   Option<Duration>,
+    /// Connection timeout (for establishing connections)
+    pub connect_timeout: Option<Duration>,
+}
+
+impl Default for ConnectionTimeouts {
+    fn default() -> Self {
+        Self {
+            read_timeout:    Some(Duration::from_secs(30)),
+            write_timeout:   Some(Duration::from_secs(30)),
+            connect_timeout: Some(Duration::from_secs(10)),
+        }
+    }
 }
 
 /// Main transport trait for different transport implementations
@@ -65,41 +97,68 @@ pub trait TransportListener: Send + Sync {
     /// Accept a new incoming connection
     async fn accept(&mut self) -> TransportResult<Self::Stream>;
 
-    /// Get the local address this listener is bound to
+    /// Get the local address of the transport
     ///
     /// # Errors
     ///
-    /// Returns `TransportError` if the local address cannot be retrieved.
+    /// Returns an error if the local address cannot be determined (e.g., if the
+    /// underlying socket is not bound or an I/O error occurs).
     fn local_addr(&self) -> TransportResult<String>;
 
-    /// Closes the listener, stopping it from accepting new connections.
-    /// Depending on the transport, this might also release underlying
-    /// resources.
+    /// Closes the listener, stopping it from accepting new connections
     async fn close(&mut self) -> TransportResult<()>;
 }
 
-/// Extension trait for framed message reading/writing
+/// Extension trait for binary frame-based transport (low-level)
 #[async_trait]
 pub trait FramedTransport: TransportStream {
-    /// Read a complete message frame
+    /// Read a complete binary frame
     async fn read_frame(&mut self) -> TransportResult<Bytes>;
 
-    /// Write a complete message frame
-    async fn write_frame(&mut self, data: &[u8]) -> TransportResult<()>;
+    /// Write a complete binary frame
+    async fn write_frame(&mut self, data: Bytes) -> TransportResult<()>;
+}
+
+/// Higher-level message-based transport that directly works with protocol
+/// Messages
+#[async_trait]
+pub trait MessageTransport: Send + Sync {
+    /// Send a protocol message
+    async fn send_message(&mut self, message: &Message) -> TransportResult<()>;
+
+    /// Receive a protocol message
+    async fn receive_message(&mut self) -> TransportResult<Message>;
+
+    /// Get the underlying transport stream
+    fn stream(&self) -> &dyn TransportStream;
+
+    /// Get a mutable reference to the underlying transport stream
+    fn stream_mut(&mut self) -> &mut dyn TransportStream;
+
+    /// Close the transport
+    async fn close(&mut self) -> TransportResult<()>;
 }
 
 /// Transport factory for creating transport instances
+#[async_trait]
 pub trait TransportFactory: Send + Sync {
     /// Create a transport instance from a URL
     ///
     /// # Errors
     ///
-    /// Returns `TransportError` if a transport cannot be created for the given
-    /// URL (e.g., unsupported scheme, invalid URL format).
+    /// Returns an error if the URL is invalid, the transport scheme is
+    /// unsupported, or if there's an issue initializing the transport
+    /// (e.g., network errors for TCP).
     fn create_transport(
         &self,
         url: &str,
     ) -> TransportResult<Arc<dyn Transport<Stream = Box<dyn TransportStream>>>>;
+
+    /// Create a message transport instance from a URL
+    async fn create_message_transport(
+        &self,
+        url: &str,
+    ) -> TransportResult<Box<dyn MessageTransport>>;
 }
 
 // Implement TransportStream for Box<dyn TransportStream> to enable type erasure
@@ -115,5 +174,9 @@ impl TransportStream for Box<dyn TransportStream> {
 
     async fn close(&mut self) -> TransportResult<()> {
         (**self).close().await
+    }
+
+    fn timeouts(&self) -> ConnectionTimeouts {
+        (**self).timeouts()
     }
 }

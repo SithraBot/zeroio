@@ -57,7 +57,7 @@ where
         &self,
         _url: &str,
     ) -> TransportResult<Box<dyn crate::traits::TransportListener<Stream = Self::Stream>>> {
-        Err(TransportError::NotSupported(
+        Err(TransportError::UnsupportedTransport(
             "Type-erased transport listeners are not supported via TransportManager.".to_string(),
         ))
     }
@@ -146,9 +146,9 @@ impl TransportManager {
         self.track_connection_attempt(url);
 
         // Create new connection
-        let transport = self
-            .find_transport_for_url(url)
-            .ok_or_else(|| TransportError::NotSupported(format!("No transport for URL: {url}")))?;
+        let transport = self.find_transport_for_url(url).ok_or_else(|| {
+            TransportError::UnsupportedTransport(format!("No transport for URL: {url}"))
+        })?;
 
         let stream = transport.connect(url).await?;
 
@@ -159,7 +159,8 @@ impl TransportManager {
     }
 
     /// Find the appropriate transport for a given URL
-    fn find_transport_for_url(
+    #[must_use]
+    pub fn find_transport_for_url(
         &self,
         url: &str,
     ) -> Option<Arc<dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync>> {

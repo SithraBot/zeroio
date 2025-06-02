@@ -253,8 +253,10 @@ dependencies = [
  "async-trait",
  "bytes",
  "dashmap",
+ "fleximq-protocol",
  "futures-util",
  "http",
+ "log",
  "lru",
  "mockall",
  "socket2",
@@ -262,6 +264,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "url",
 ]
 
