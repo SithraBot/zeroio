@@ -7,7 +7,7 @@
 //! - Zero-copy operations
 
 use fleximq_protocol::{
-    Message, MessageBuilder, ProtocolResult, StatusCode,
+    Message, MessageBuilder, MessageType, ProtocolResult, StatusCode,
     constants::*,
     parser::{MessageParser, peek_message_info},
 };
@@ -65,7 +65,8 @@ fn demonstrate_message_creation() -> ProtocolResult<()> {
 
     // 1. JOIN message with authentication
     let join_msg =
-        MessageBuilder::join_with_token(CLIENT_ID_UNASSIGNED, "secure-token-123").build()?;
+        MessageBuilder::join_with_token(CLIENT_ID_UNASSIGNED, "example-client", "secure-token-123")
+            .build()?;
     println!(
         "  📝 Created JOIN message: {} bytes",
         join_msg.to_bytes()?.len()
@@ -79,7 +80,8 @@ fn demonstrate_message_creation() -> ProtocolResult<()> {
         published_at: 1700000000,
     };
 
-    let publish_msg = MessageBuilder::simple_publish(1000, "news.technology")
+    let publish_msg = MessageBuilder::publish(1000)
+        .with_topic("news.technology")
         .build_with_payload(&news_article)?;
     println!(
         "  📰 Created PUBLISH message: {} bytes",
@@ -87,8 +89,9 @@ fn demonstrate_message_creation() -> ProtocolResult<()> {
     );
 
     // 3. Request-Response pattern
-    let user_request =
-        MessageBuilder::simple_request(1000, 2000, "/api/users/123", "req-001").build()?;
+    let user_request = MessageBuilder::request(1000, "client-source", "/api/users/123", Some(2000))
+        .as_request("req-001")
+        .build()?;
     println!(
         "  📤 Created REQUEST message: {} bytes",
         user_request.to_bytes()?.len()
@@ -101,7 +104,8 @@ fn demonstrate_message_creation() -> ProtocolResult<()> {
     };
 
     let user_response =
-        MessageBuilder::simple_response(2000, 1000, "/api/users/123", "req-001", StatusCode::OK)
+        MessageBuilder::response(2000, "client-target", "req-001", "/api/users/123", 1000)
+            .status(StatusCode::OK)
             .build_with_payload(&user_data)?;
     println!(
         "  📥 Created RESPONSE message: {} bytes",
@@ -286,8 +290,7 @@ fn demonstrate_validation() -> ProtocolResult<()> {
     // Valid message examples
     println!("  ✅ Valid messages:");
 
-    let valid_req = MessageBuilder::request(1000)
-        .route_to(2000, "/api/test")
+    let valid_req = MessageBuilder::request(1000, "client-source", "/api/test", Some(2000))
         .as_request("req-123")
         .build();
 
@@ -296,7 +299,7 @@ fn demonstrate_validation() -> ProtocolResult<()> {
         Err(e) => println!("    ❌ Unexpected error: {e}"),
     }
 
-    let valid_sub = MessageBuilder::subscribe(1000).topic("valid.topic").build();
+    let valid_sub = MessageBuilder::subscribe(1000).with_topic("valid.topic").build();
 
     match valid_sub {
         Ok(_) => println!("    ✅ Valid SUBSCRIBE message created"),
@@ -307,7 +310,7 @@ fn demonstrate_validation() -> ProtocolResult<()> {
     println!("  ❌ Invalid messages (expected failures):");
 
     // REQ message missing routing
-    let invalid_req = MessageBuilder::request(1000).as_request("req-123").build();
+    let invalid_req = MessageBuilder::new(MessageType::Request, 1000).as_request("req-123").build();
 
     match invalid_req {
         Ok(_) => println!("    ❌ Should have failed!"),
@@ -316,7 +319,7 @@ fn demonstrate_validation() -> ProtocolResult<()> {
 
     // SUB message with forbidden status field
     let invalid_sub = MessageBuilder::subscribe(1000)
-        .topic("test.topic")
+        .with_topic("test.topic")
         .status(StatusCode::OK) // Forbidden for SUB
         .build();
 
@@ -333,7 +336,8 @@ fn demonstrate_message_correlation() -> ProtocolResult<()> {
     println!("🔗 Message Correlation Examples:");
 
     // Create a request
-    let request = MessageBuilder::simple_request(1000, 2000, "/api/data", "correlation-123")
+    let request = MessageBuilder::request(1000, "client-source", "/api/data", Some(2000))
+        .as_request("correlation-123")
         .build_with_payload(&serde_json::json!({
             "query": "SELECT * FROM users"
         }))?;
@@ -352,9 +356,10 @@ fn demonstrate_message_correlation() -> ProtocolResult<()> {
         "count": 2
     });
 
+    // Creating a response from the request message
     let response = request_msg.create_response(
         2000, // Responder client ID
-        fleximq_protocol::Header::new().with_status(StatusCode::OK),
+        Some(StatusCode::OK),
         Some(&response_data),
     )?;
 

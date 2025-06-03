@@ -5,6 +5,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 
 use crate::{
+    RequestResponse, StatusCode,
     errors::{ProtocolError, ProtocolResult},
     types::{BaseHeader, ClientId, Header, MessageType},
 };
@@ -265,8 +266,8 @@ impl Message {
 
     /// Create a response message with the same correlation ID
     ///
-    /// This is a convenience method for creating REP messages
-    /// that properly correlate with REQ messages.
+    /// This is a convenience method for creating REP messages that properly
+    /// correlate with REQ messages.
     ///
     /// # Errors
     ///
@@ -275,7 +276,7 @@ impl Message {
     pub fn create_response(
         &self,
         sender_client_id: ClientId,
-        header: Header,
+        status: Option<StatusCode>,
         payload: Option<&impl serde::Serialize>,
     ) -> ProtocolResult<RawMessage> {
         // Validate this is a request message
@@ -303,17 +304,13 @@ impl Message {
         }
 
         // Create response with correlation
-        let mut response_header = header;
-        response_header.reqrep = Some(crate::types::RequestResponse {
+        let mut response_header = Header::new();
+        response_header.reqrep = Some(RequestResponse {
             req_type: crate::types::RequestResponseType::Correlation,
             id:       req_reqrep.id,
         });
-
-        // Route back to the original sender
-        response_header.routing = Some(vec![crate::types::Routing {
-            client_id: self.base_header.client_id,       // Original sender
-            path:      original_routing[0].path.clone(), // Use same path
-        }]);
+        response_header.routing = Some(original_routing);
+        response_header.status = status;
 
         RawMessage::new(
             MessageType::Response,

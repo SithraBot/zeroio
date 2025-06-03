@@ -292,7 +292,7 @@ pub fn validate_message_structure(
     // Define required and forbidden fields for each message type
     let (required, forbidden) = match message_type {
         Join => (
-            vec![],
+            vec![HeaderField::ClientName],
             vec![
                 HeaderField::Routing,
                 HeaderField::Reqrep,
@@ -405,6 +405,13 @@ pub fn validate_message_structure(
                         message_type.as_str(),
                         routing.len()
                     )));
+                }
+
+                // For Response messages, client_id must be present in routing
+                if message_type == Response && routing[0].client_id.is_none() {
+                    return Err(ProtocolError::InvalidRouting(
+                        "REP messages must include client_id in routing".to_string(),
+                    ));
                 }
             }
         }
@@ -527,10 +534,13 @@ mod tests {
     #[test]
     fn test_message_validation() {
         // Valid REQ message
-        let header = Header::new().with_route(1234, "/api/test").with_reqrep(RequestResponse {
-            req_type: RequestResponseType::Request,
-            id:       "test-id".to_string(),
-        });
+        let header =
+            Header::new()
+                .with_route("client-1234", "/api/test")
+                .with_reqrep(RequestResponse {
+                    req_type: RequestResponseType::Request,
+                    id:       "test-id".to_string(),
+                });
 
         validate_message_structure(MessageType::Request, &header).unwrap();
 

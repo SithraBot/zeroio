@@ -134,8 +134,13 @@ impl StatusCode {
 /// Routing information
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Routing {
-    pub client_id: ClientId,
-    pub path:      String,
+    /// Client name for service identification
+    pub client_name: String,
+    /// Routing path
+    pub path:        String,
+    /// Optional client ID (required for response messages)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id:   Option<ClientId>,
 }
 
 /// Request/Response correlation
@@ -269,6 +274,10 @@ pub struct Header {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keepalive: Option<KeepAlive>,
 
+    /// Client name for JOIN messages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_name: Option<String>,
+
     /// Additional fields for extensibility
     #[serde(flatten)]
     pub additional: HashMap<String, rmpv::Value>,
@@ -279,13 +288,14 @@ impl Header {
     #[must_use]
     pub fn new() -> Self {
         Header {
-            routing:    None,
-            reqrep:     None,
-            topic:      None,
-            status:     None,
-            auth:       None,
-            keepalive:  None,
-            additional: HashMap::new(),
+            routing:     None,
+            reqrep:      None,
+            topic:       None,
+            status:      None,
+            auth:        None,
+            keepalive:   None,
+            client_name: None,
+            additional:  HashMap::new(),
         }
     }
 
@@ -296,12 +306,29 @@ impl Header {
         self
     }
 
-    /// Add single routing target
+    /// Add single routing target with client name and path
     #[must_use]
-    pub fn with_route(mut self, client_id: ClientId, path: impl Into<String>) -> Self {
+    pub fn with_route(mut self, client_name: impl Into<String>, path: impl Into<String>) -> Self {
         self.routing = Some(vec![Routing {
-            client_id,
-            path: path.into(),
+            client_name: client_name.into(),
+            path:        path.into(),
+            client_id:   None,
+        }]);
+        self
+    }
+
+    /// Add single routing target with client name, path, and client ID
+    #[must_use]
+    pub fn with_route_and_id(
+        mut self,
+        client_name: impl Into<String>,
+        path: impl Into<String>,
+        client_id: ClientId,
+    ) -> Self {
+        self.routing = Some(vec![Routing {
+            client_name: client_name.into(),
+            path:        path.into(),
+            client_id:   Some(client_id),
         }]);
         self
     }
@@ -340,6 +367,13 @@ impl Header {
         self.keepalive = Some(keepalive);
         self
     }
+
+    /// Add client name for JOIN messages
+    #[must_use]
+    pub fn with_client_name(mut self, client_name: impl Into<String>) -> Self {
+        self.client_name = Some(client_name.into());
+        self
+    }
 }
 
 impl Default for Header {
@@ -357,6 +391,7 @@ pub enum HeaderField {
     Status,
     Auth,
     Keepalive,
+    ClientName,
 }
 
 impl HeaderField {
@@ -370,6 +405,7 @@ impl HeaderField {
             HeaderField::Status => "status",
             HeaderField::Auth => "auth",
             HeaderField::Keepalive => "keepalive",
+            HeaderField::ClientName => "client_name",
         }
     }
 
@@ -383,6 +419,7 @@ impl HeaderField {
             HeaderField::Status => header.status.is_some(),
             HeaderField::Auth => header.auth.is_some(),
             HeaderField::Keepalive => header.keepalive.is_some(),
+            HeaderField::ClientName => header.client_name.is_some(),
         }
     }
 }
