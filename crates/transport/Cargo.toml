@@ -4,8 +4,11 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+
+lru.workspace = true
+
 # Protocol
-fleximq-protocol = { path = "../protocol" }
+fleximq-protocol.workspace = true
 
 # Async runtime
 tokio.workspace = true
@@ -13,14 +16,13 @@ tokio-util.workspace = true
 async-trait.workspace = true
 
 # Logging
-log = "0.4"
+log.workspace = true
 
 # Error handling
 thiserror.workspace = true
 
 # Data structures
 bytes.workspace = true
-lru = "0.14"
 dashmap.workspace = true
 
 # URL parsing
@@ -33,8 +35,6 @@ socket2 = { version = "0.5", features = ["all"] }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util.workspace = true
 http = "1.3"
-
-# Deserialization
 
 [dev-dependencies]
 mockall = "0.13"

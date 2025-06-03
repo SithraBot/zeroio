@@ -50,4 +50,11 @@ cargo test --package fleximq --lib router::tests
 
 ## 许可证
 
-本项目采用 Unlicense 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。 
+本项目采用 Unlicense 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+
+## 代办
+
+- [x] protocol
+- [x] transport
+- [ ] broker
+- [ ] client

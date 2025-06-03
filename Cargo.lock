@@ -243,10 +243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fleximq-server"
-version = "0.1.0"
-
-[[package]]
 name = "fleximq-transport"
 version = "0.1.0"
 dependencies = [

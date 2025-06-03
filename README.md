@@ -51,3 +51,10 @@ cargo test --package fleximq --lib router::tests
 ## License
 
 This project is licensed under the Unlicense - see the [LICENSE](LICENSE) file for details.
+
+## Todo
+
+- [x] protocol
+- [x] transport
+- [ ] broker
+- [ ] client
