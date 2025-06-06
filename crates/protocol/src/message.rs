@@ -293,7 +293,7 @@ impl Message {
         })?;
 
         // Get original routing to respond back
-        let original_routing = req_header.routing.ok_or_else(|| {
+        let mut original_routing = req_header.routing.ok_or_else(|| {
             ProtocolError::InvalidFormat("Request message missing routing field".to_string())
         })?;
 
@@ -302,6 +302,8 @@ impl Message {
                 "Request message has empty routing".to_string(),
             ));
         }
+
+        original_routing[0].client_id = Some(self.client_id());
 
         // Create response with correlation
         let mut response_header = Header::new();

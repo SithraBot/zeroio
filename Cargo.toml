@@ -11,6 +11,7 @@ version = "0.1.0"
 # Workspace member crates
 
 fleximq-protocol = { path = "crates/protocol" }
+fleximq-transport = { path = "crates/transport" }
 
 # External crates
 serde = { version = "1.0", features = ["derive"] }

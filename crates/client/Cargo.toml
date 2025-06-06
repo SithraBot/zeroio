@@ -4,6 +4,18 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+fleximq-protocol.workspace = true
+fleximq-transport.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+log.workspace = true
+rmpv.workspace = true
+rmp-serde.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+ulid.workspace = true
+url.workspace = true
 
 [lints]
 workspace = true
