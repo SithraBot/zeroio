@@ -1,5 +1,5 @@
 [package]
-name = "fleximq-client"
+name = "fleximq-peer"
 version.workspace = true
 edition.workspace = true
 
@@ -16,6 +16,8 @@ thiserror.workspace = true
 tokio.workspace = true
 ulid.workspace = true
 url.workspace = true
+pin-project = "1"
+futures-util.workspace = true
 
 [lints]
 workspace = true
