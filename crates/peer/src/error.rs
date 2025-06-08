@@ -7,10 +7,12 @@ use thiserror::Error;
 pub enum Error {
     #[error("Protocol error: {0}")]
     Protocol(#[from] ProtocolError),
+    #[error("Message does not contain payload")]
+    NoPayload,
 }
 
 impl From<Infallible> for Error {
     fn from(_: Infallible) -> Self {
-        panic!()
+        unreachable!()
     }
 }

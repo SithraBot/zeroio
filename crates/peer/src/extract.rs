@@ -9,6 +9,7 @@ use std::{
 use fleximq_protocol::{Header, Message, ProtocolError};
 use futures_util::{future, ready};
 use pin_project::pin_project;
+use serde::de::DeserializeOwned;
 
 use crate::error::Error;
 pub trait FromMessage: Sized {
@@ -104,9 +105,9 @@ impl FromMessage for Header {
     }
 }
 
-pub struct Payload<T>(T);
+pub struct Payload<T: DeserializeOwned>(T);
 
-impl<T> Payload<T> {
+impl<T: DeserializeOwned> Payload<T> {
     pub fn new(value: T) -> Self {
         Payload(value)
     }
@@ -116,7 +117,7 @@ impl<T> Payload<T> {
     }
 }
 
-impl<T> Deref for Payload<T> {
+impl<T: DeserializeOwned> Deref for Payload<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -124,8 +125,25 @@ impl<T> Deref for Payload<T> {
     }
 }
 
-impl<T> DerefMut for Payload<T> {
+impl<T: DeserializeOwned> DerefMut for Payload<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<T: DeserializeOwned> FromMessage for Payload<T> {
+    type Error = ProtocolError;
+    type Future = future::Ready<Result<Self, Self::Error>>;
+
+    fn from_message(message: &Message) -> Self::Future {
+        let payload = message.payload_as::<T>();
+        let payload = match payload {
+            Err(error) => Err(error),
+            Ok(value) => value.map_or_else(
+                || Err(ProtocolError::InvalidFormat("Payload is empty".to_string())),
+                |value| Ok(Payload::new(value)),
+            ),
+        };
+        future::ready(payload)
     }
 }
