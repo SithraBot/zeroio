@@ -1,8 +1,10 @@
 //! Message structures with lazy parsing support
 
-use std::sync::Arc;
+use bytes::{BufMut, Bytes, BytesMut};
+use once_cell::sync::OnceCell;
+use serde::{Serialize, de::DeserializeOwned};
 
-use bytes::Bytes;
+pub const NIL: rmpv::Value = rmpv::Value::Nil;
 
 use crate::{
     RequestResponse, StatusCode,
@@ -24,10 +26,10 @@ pub struct Message {
     raw_data: Bytes,
 
     /// Cached parsed header (lazy)
-    header_cache: Arc<std::sync::RwLock<Option<Header>>>,
+    header_cache: OnceCell<Header>,
 
     /// Cached parsed payload (lazy)
-    payload_cache: Arc<std::sync::RwLock<Option<rmpv::Value>>>,
+    payload_cache: OnceCell<rmpv::Value>,
 }
 
 impl Message {
@@ -63,8 +65,8 @@ impl Message {
         Ok(Message {
             base_header,
             raw_data: data,
-            header_cache: Arc::new(std::sync::RwLock::new(None)),
-            payload_cache: Arc::new(std::sync::RwLock::new(None)),
+            header_cache: OnceCell::new(),
+            payload_cache: OnceCell::new(),
         })
     }
 
@@ -106,38 +108,19 @@ impl Message {
     /// # Errors
     ///
     /// Returns an error if header deserialization fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the `RwLock` for `header_cache` is poisoned.
-    pub fn header(&self) -> ProtocolResult<Header> {
-        // Try to read from cache first
-        #[allow(clippy::unwrap_used)]
-        {
-            let cache = self.header_cache.read().unwrap();
-            if let Some(ref header) = *cache {
-                return Ok(header.clone());
+    pub fn header(&self) -> ProtocolResult<&Header> {
+        // Parse header if not cached
+        fn init(this: &Message) -> ProtocolResult<Header> {
+            if this.base_header.header_length > 0 {
+                let start = crate::constants::BASE_HEADER_SIZE;
+                let end = start + this.base_header.header_length as usize;
+                let header_bytes = this.raw_data.slice(start..end);
+                Ok(rmp_serde::from_slice::<Header>(&header_bytes)?)
+            } else {
+                Ok(Header::default())
             }
         }
-
-        // Parse header if not cached
-        let header = if self.base_header.header_length > 0 {
-            let start = crate::constants::BASE_HEADER_SIZE;
-            let end = start + self.base_header.header_length as usize;
-            let header_bytes = self.raw_data.slice(start..end);
-            rmp_serde::from_slice::<Header>(&header_bytes)?
-        } else {
-            Header::default()
-        };
-
-        // Cache the parsed header
-        #[allow(clippy::unwrap_used)]
-        {
-            let mut cache = self.header_cache.write().unwrap();
-            *cache = Some(header.clone());
-        }
-
-        Ok(header)
+        self.header_cache.get_or_try_init(|| init(self))
     }
 
     /// Parse and cache the payload if not already cached
@@ -148,60 +131,35 @@ impl Message {
     /// # Errors
     ///
     /// Returns an error if payload deserialization fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the `RwLock` for `payload_cache` is poisoned.
-    #[allow(clippy::unwrap_used)]
-    pub fn payload(&self) -> ProtocolResult<Option<rmpv::Value>> {
-        // Try to read from cache first
-        #[allow(clippy::unwrap_used)]
-        {
-            let cache = self.payload_cache.read().unwrap();
-            if cache.is_some() {
-                return Ok(cache.clone());
+    pub fn payload(&self) -> ProtocolResult<&rmpv::Value> {
+        // Parse payload if not cached
+        fn init(this: &Message) -> ProtocolResult<rmpv::Value> {
+            if this.base_header.payload_length > 0 {
+                let start =
+                    crate::constants::BASE_HEADER_SIZE + this.base_header.header_length as usize;
+                let end = start + this.base_header.payload_length as usize;
+                let payload_bytes = this.raw_data.slice(start..end);
+                Ok(rmp_serde::from_slice::<rmpv::Value>(&payload_bytes)?)
+            } else {
+                Ok(rmpv::Value::Nil)
             }
         }
 
-        // Parse payload if not cached
-        let payload = if self.base_header.payload_length > 0 {
-            let start =
-                crate::constants::BASE_HEADER_SIZE + self.base_header.header_length as usize;
-            let end = start + self.base_header.payload_length as usize;
-            let payload_bytes = self.raw_data.slice(start..end);
-            Some(rmp_serde::from_slice::<rmpv::Value>(&payload_bytes)?)
-        } else {
-            None
-        };
-
-        // Cache the parsed payload
-        {
-            let mut cache = self.payload_cache.write().unwrap();
-            *cache = payload.clone();
-        }
-
-        Ok(payload)
+        self.payload_cache.get_or_try_init(|| init(self))
     }
 
     /// Deserialize payload to a specific type
     ///
+    /// Will clone the payload before deserialization.
+    ///
     /// # Errors
     ///
     /// Returns an error if payload deserialization fails.
-    pub fn payload_as<T>(&self) -> ProtocolResult<Option<T>>
+    pub fn payload_as<T>(&self) -> ProtocolResult<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        if self.base_header.payload_length == 0 {
-            return Ok(None);
-        }
-
-        let start = crate::constants::BASE_HEADER_SIZE + self.base_header.header_length as usize;
-        let end = start + self.base_header.payload_length as usize;
-        let payload_bytes = self.raw_data.slice(start..end);
-
-        let value = rmp_serde::from_slice::<T>(&payload_bytes)?;
-        Ok(Some(value))
+        Ok(rmpv::ext::from_value(self.payload()?.clone())?)
     }
 
     /// Get raw header bytes without parsing
@@ -227,23 +185,13 @@ impl Message {
     }
 
     /// Check if the message has a cached header
-    ///
-    /// # Panics
-    ///
-    /// Panics if the `RwLock` for `header_cache` is poisoned.
-    #[allow(clippy::unwrap_used)]
     pub fn is_header_cached(&self) -> bool {
-        self.header_cache.read().unwrap().is_some()
+        self.header_cache.get().is_some()
     }
 
     /// Check if the message has a cached payload
-    ///
-    /// # Panics
-    ///
-    /// Panics if the `RwLock` for `payload_cache` is poisoned.
-    #[allow(clippy::unwrap_used)]
     pub fn is_payload_cached(&self) -> bool {
-        self.payload_cache.read().unwrap().is_some()
+        self.payload_cache.get().is_some()
     }
 
     /// Clear cached data to free memory
@@ -253,15 +201,9 @@ impl Message {
     /// Panics if the `RwLock` for `header_cache` or `payload_cache` is
     /// poisoned.
     #[allow(clippy::unwrap_used)]
-    pub fn clear_cache(&self) {
-        {
-            let mut header_cache = self.header_cache.write().unwrap();
-            *header_cache = None;
-        }
-        {
-            let mut payload_cache = self.payload_cache.write().unwrap();
-            *payload_cache = None;
-        }
+    pub fn clear_cache(&mut self) {
+        let _ = self.header_cache.take();
+        let _ = self.payload_cache.take();
     }
 
     /// Create a response message with the same correlation ID
@@ -277,7 +219,7 @@ impl Message {
         &self,
         sender_client_id: ClientId,
         status: Option<StatusCode>,
-        payload: Option<&impl serde::Serialize>,
+        payload: &impl serde::Serialize,
     ) -> ProtocolResult<RawMessage> {
         // Validate this is a request message
         if self.base_header.message_type != MessageType::Request {
@@ -288,12 +230,12 @@ impl Message {
 
         // Get the original request header to extract correlation info
         let req_header = self.header()?;
-        let req_reqrep = req_header.reqrep.ok_or_else(|| {
+        let req_reqrep = req_header.reqrep.clone().ok_or_else(|| {
             ProtocolError::InvalidFormat("Request message missing reqrep field".to_string())
         })?;
 
         // Get original routing to respond back
-        let mut original_routing = req_header.routing.ok_or_else(|| {
+        let mut original_routing = req_header.routing.clone().ok_or_else(|| {
             ProtocolError::InvalidFormat("Request message missing routing field".to_string())
         })?;
 
@@ -332,7 +274,7 @@ pub struct RawMessage {
     pub message_type: MessageType,
     pub client_id:    ClientId,
     pub header:       Header,
-    pub payload_data: Option<Bytes>,
+    pub payload_data: Bytes,
 }
 
 impl RawMessage {
@@ -345,16 +287,15 @@ impl RawMessage {
         message_type: MessageType,
         client_id: ClientId,
         header: Header,
-        payload: Option<&T>,
+        payload: &T,
     ) -> ProtocolResult<Self>
     where
         T: serde::Serialize,
     {
-        let payload_data = if let Some(payload) = payload {
-            let bytes = rmp_serde::to_vec(payload)?;
-            Some(Bytes::from(bytes))
-        } else {
-            None
+        let payload_data = {
+            let mut bytes = BytesMut::new().writer();
+            rmp_serde::encode::write(&mut bytes, payload)?;
+            Bytes::from(bytes.into_inner())
         };
 
         Ok(RawMessage {
@@ -379,7 +320,7 @@ impl RawMessage {
         };
 
         let header_length = header_bytes.len() as u32;
-        let payload_length = self.payload_data.as_ref().map(|p| p.len()).unwrap_or(0) as u64;
+        let payload_length = self.payload_data.len() as u64;
 
         // Validate sizes
         if header_length > crate::constants::DEFAULT_MAX_HEADER_SIZE as u32 {
@@ -421,9 +362,7 @@ impl RawMessage {
         buffer.extend_from_slice(&header_bytes);
 
         // Write payload
-        if let Some(ref payload_data) = self.payload_data {
-            buffer.extend_from_slice(payload_data);
-        }
+        buffer.extend_from_slice(&self.payload_data);
 
         Ok(Bytes::from(buffer))
     }
@@ -444,57 +383,39 @@ impl RawMessage {
 /// This is useful when you know you need to access all parts
 /// of the message and want to parse everything upfront.
 #[derive(Debug, Clone)]
-pub struct ParsedMessage {
+pub struct TypedMessage<T> {
     pub base_header: BaseHeader,
     pub header:      Header,
-    pub payload:     Option<rmpv::Value>,
+    pub payload:     T,
 }
 
-impl ParsedMessage {
+impl<T: DeserializeOwned> TypedMessage<T> {
     /// Create from a lazy Message by parsing all fields
     ///
     /// # Errors
     ///
     /// Returns an error if header or payload parsing fails.
     pub fn from_message(message: &Message) -> ProtocolResult<Self> {
-        let header = message.header()?;
-        let payload = message.payload()?;
+        let header = message.header()?.clone();
+        let payload = message.payload_as::<T>()?;
 
-        Ok(ParsedMessage {
+        Ok(TypedMessage {
             base_header: message.base_header.clone(),
             header,
             payload,
         })
     }
-
-    /// Deserialize payload to a specific type
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if payload deserialization fails.
-    pub fn payload_as<T>(&self) -> ProtocolResult<Option<T>>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        match &self.payload {
-            Some(value) => {
-                let result = rmpv::ext::from_value(value.clone())?;
-                Ok(Some(result))
-            }
-            None => Ok(None),
-        }
-    }
 }
 
-impl From<ParsedMessage> for Message {
+impl<T: Serialize> From<TypedMessage<T>> for Message {
     #[allow(clippy::expect_used)]
-    fn from(parsed: ParsedMessage) -> Self {
+    fn from(typed: TypedMessage<T>) -> Self {
         // Create a RawMessage and convert to Message
         let raw = RawMessage::new(
-            parsed.base_header.message_type,
-            parsed.base_header.client_id,
-            parsed.header,
-            parsed.payload.as_ref(),
+            typed.base_header.message_type,
+            typed.base_header.client_id,
+            typed.header,
+            &typed.payload,
         )
         .expect("Failed to create RawMessage from ParsedMessage");
 
@@ -512,7 +433,7 @@ mod tests {
         let header = Header::new().with_topic("test");
         let payload = serde_json::json!({"test": "data"});
 
-        let raw = RawMessage::new(MessageType::Publish, 1000, header, Some(&payload)).unwrap();
+        let raw = RawMessage::new(MessageType::Publish, 1000, header, &payload).unwrap();
 
         let message = raw.into_message().unwrap();
 
@@ -530,7 +451,7 @@ mod tests {
         assert!(message.is_header_cached());
 
         // Access payload - should be cached after first access
-        let _payload = message.payload().unwrap().unwrap();
+        let _payload = message.payload().unwrap();
         assert!(message.is_payload_cached());
     }
 }

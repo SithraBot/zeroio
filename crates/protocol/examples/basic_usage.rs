@@ -253,7 +253,7 @@ fn demonstrate_zero_copy() -> ProtocolResult<()> {
         MessageBuilder::simple_publish(1000, "data.stream").build_with_payload(&original_data)?;
 
     let bytes = raw_msg.to_bytes()?;
-    let message = Message::from_bytes(bytes)?;
+    let mut message = Message::from_bytes(bytes)?;
 
     println!("  📏 Original message size: {} bytes", message.total_size());
 
@@ -360,7 +360,7 @@ fn demonstrate_message_correlation() -> ProtocolResult<()> {
     let response = request_msg.create_response(
         2000, // Responder client ID
         Some(StatusCode::OK),
-        Some(&response_data),
+        &response_data,
     )?;
 
     println!("  📥 Created correlated response");

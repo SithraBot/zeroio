@@ -12,22 +12,22 @@ use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 
 use crate::error::Error;
-pub trait FromMessage: Sized {
+pub trait FromMessage<'a>: Sized {
     type Error: Into<Error>;
     type Future: Future<Output = Result<Self, Self::Error>>;
 
     /// Create a new instance from a message asynchronously.
-    fn from_message(message: &Message) -> Self::Future;
+    fn from_message(message: &'a Message) -> Self::Future;
 }
 
-impl<T> FromMessage for Option<T>
+impl<'a, T> FromMessage<'a> for Option<T>
 where
-    T: FromMessage,
+    T: FromMessage<'a>,
 {
     type Error = Infallible;
     type Future = FromMessageOptionFuture<T::Future>;
 
-    fn from_message(message: &Message) -> Self::Future {
+    fn from_message(message: &'a Message) -> Self::Future {
         FromMessageOptionFuture {
             future: T::from_message(message),
         }
@@ -57,16 +57,16 @@ where
     }
 }
 
-impl<T, E> FromMessage for Result<T, E>
+impl<'a, T, E> FromMessage<'a> for Result<T, E>
 where
-    T: FromMessage,
+    T: FromMessage<'a>,
     T::Error: Into<E>,
 {
     type Error = Infallible;
     type Future = FromMessageResultFuture<T::Future, E>;
 
     #[inline]
-    fn from_message(message: &Message) -> Self::Future {
+    fn from_message(message: &'a Message) -> Self::Future {
         FromMessageResultFuture {
             fut:      T::from_message(message),
             _phantom: PhantomData,
@@ -95,11 +95,11 @@ where
     }
 }
 
-impl FromMessage for Header {
+impl<'a> FromMessage<'a> for &'a Header {
     type Error = ProtocolError;
     type Future = future::Ready<Result<Self, Self::Error>>;
 
-    fn from_message(message: &Message) -> Self::Future {
+    fn from_message(message: &'a Message) -> Self::Future {
         let header = message.header();
         future::ready(header)
     }
@@ -131,19 +131,12 @@ impl<T: DeserializeOwned> DerefMut for Payload<T> {
     }
 }
 
-impl<T: DeserializeOwned> FromMessage for Payload<T> {
+impl<T: DeserializeOwned> FromMessage<'_> for Payload<T> {
     type Error = ProtocolError;
     type Future = future::Ready<Result<Self, Self::Error>>;
 
     fn from_message(message: &Message) -> Self::Future {
         let payload = message.payload_as::<T>();
-        let payload = match payload {
-            Err(error) => Err(error),
-            Ok(value) => value.map_or_else(
-                || Err(ProtocolError::InvalidFormat("Payload is empty".to_string())),
-                |value| Ok(Payload::new(value)),
-            ),
-        };
-        future::ready(payload)
+        future::ready(payload.map(|value| Payload(value)))
     }
 }

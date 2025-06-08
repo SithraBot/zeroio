@@ -494,12 +494,15 @@ pub fn peek_message_info(data: &[u8]) -> ProtocolResult<(MessageType, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{message::RawMessage, types::*};
+    use crate::{
+        message::{NIL, RawMessage},
+        types::*,
+    };
 
     #[test]
     fn test_base_header_parsing() {
         let header = Header::new().with_topic("test");
-        let raw = RawMessage::new(MessageType::Publish, 1000, header, None::<&()>).unwrap();
+        let raw = RawMessage::new(MessageType::Publish, 1000, header, &NIL).unwrap();
         let bytes = raw.to_bytes().unwrap();
 
         let base_header = parse_base_header(&bytes).unwrap();
@@ -512,7 +515,7 @@ mod tests {
     fn test_streaming_parser() {
         let header = Header::new().with_topic("test");
         let payload = serde_json::json!({"data": "test"});
-        let raw = RawMessage::new(MessageType::Publish, 1000, header, Some(&payload)).unwrap();
+        let raw = RawMessage::new(MessageType::Publish, 1000, header, &payload).unwrap();
         let bytes = raw.to_bytes().unwrap();
 
         let mut parser = MessageParser::new();
@@ -561,7 +564,7 @@ mod tests {
     #[test]
     fn test_peek_message_info() {
         let header = Header::new().with_topic("test");
-        let raw = RawMessage::new(MessageType::Subscribe, 5678, header, None::<&()>).unwrap();
+        let raw = RawMessage::new(MessageType::Subscribe, 5678, header, &NIL).unwrap();
         let bytes = raw.to_bytes().unwrap();
 
         let (msg_type, client_id) = peek_message_info(&bytes).unwrap();

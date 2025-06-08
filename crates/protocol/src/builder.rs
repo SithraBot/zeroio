@@ -2,7 +2,7 @@
 
 use crate::{
     errors::ProtocolResult,
-    message::{Message, RawMessage},
+    message::{Message, NIL, RawMessage},
     types::{
         Auth, ClientId, Header, KeepAlive, MessageType, RequestResponse, RequestResponseType,
         Routing, StatusCode,
@@ -259,7 +259,7 @@ impl MessageBuilder {
         // Validate message structure
         crate::parser::validate_message_structure(self.message_type, &self.header)?;
 
-        RawMessage::new(self.message_type, self.client_id, self.header, None::<&()>)
+        RawMessage::new(self.message_type, self.client_id, self.header, &NIL)
     }
 
     /// Build the message with payload
@@ -275,12 +275,7 @@ impl MessageBuilder {
         // Validate message structure
         crate::parser::validate_message_structure(self.message_type, &self.header)?;
 
-        RawMessage::new(
-            self.message_type,
-            self.client_id,
-            self.header,
-            Some(payload),
-        )
+        RawMessage::new(self.message_type, self.client_id, self.header, payload)
     }
 }
 

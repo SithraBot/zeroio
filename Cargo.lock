@@ -255,6 +255,7 @@ dependencies = [
  "futures-util",
  "memchr",
  "nom",
+ "once_cell",
  "rmp-serde",
  "rmpv",
  "serde",

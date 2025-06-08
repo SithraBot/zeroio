@@ -23,7 +23,7 @@ pub use builder::MessageBuilder;
 pub use bytes::{Bytes, BytesMut};
 pub use codec::{MessageCodec, MessageDecoder, MessageEncoder};
 pub use errors::{ProtocolError, ProtocolResult};
-pub use message::{Message, ParsedMessage, RawMessage};
+pub use message::{Message, RawMessage, TypedMessage};
 pub use types::{
     Auth, ClientId, Header, HeaderField, KeepAlive, MessageType, ProtocolVersion, RequestResponse,
     Routing, StatusCode,
