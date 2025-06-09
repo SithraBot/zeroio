@@ -19,6 +19,7 @@ tokio-util.workspace = true
 nom.workspace = true
 futures-util.workspace = true
 once_cell.workspace = true
+dashmap.workspace = true
 
 # Zero-copy optimizations
 memchr = "2.7"

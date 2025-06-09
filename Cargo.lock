@@ -252,6 +252,7 @@ name = "fleximq-protocol"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "dashmap",
  "futures-util",
  "memchr",
  "nom",

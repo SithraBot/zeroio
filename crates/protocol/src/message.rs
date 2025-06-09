@@ -1,4 +1,5 @@
 //! Message structures with lazy parsing support
+use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use once_cell::sync::OnceCell;
@@ -30,6 +31,9 @@ pub struct Message {
 
     /// Cached parsed payload (lazy)
     payload_cache: OnceCell<rmpv::Value>,
+
+    /// Cached typed payload (lazy)
+    typed_payload_cache: OnceCell<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Message {
@@ -67,6 +71,7 @@ impl Message {
             raw_data: data,
             header_cache: OnceCell::new(),
             payload_cache: OnceCell::new(),
+            typed_payload_cache: OnceCell::new(),
         })
     }
 
@@ -112,10 +117,7 @@ impl Message {
         // Parse header if not cached
         fn init(this: &Message) -> ProtocolResult<Header> {
             if this.base_header.header_length > 0 {
-                let start = crate::constants::BASE_HEADER_SIZE;
-                let end = start + this.base_header.header_length as usize;
-                let header_bytes = this.raw_data.slice(start..end);
-                Ok(rmp_serde::from_slice::<Header>(&header_bytes)?)
+                Ok(rmp_serde::from_slice(&this.raw_header_bytes())?)
             } else {
                 Ok(Header::default())
             }
@@ -135,16 +137,11 @@ impl Message {
         // Parse payload if not cached
         fn init(this: &Message) -> ProtocolResult<rmpv::Value> {
             if this.base_header.payload_length > 0 {
-                let start =
-                    crate::constants::BASE_HEADER_SIZE + this.base_header.header_length as usize;
-                let end = start + this.base_header.payload_length as usize;
-                let payload_bytes = this.raw_data.slice(start..end);
-                Ok(rmp_serde::from_slice::<rmpv::Value>(&payload_bytes)?)
+                Ok(rmp_serde::from_slice(&this.raw_payload_bytes())?)
             } else {
                 Ok(rmpv::Value::Nil)
             }
         }
-
         self.payload_cache.get_or_try_init(|| init(self))
     }
 
@@ -155,11 +152,29 @@ impl Message {
     /// # Errors
     ///
     /// Returns an error if payload deserialization fails.
-    pub fn payload_as<T>(&self) -> ProtocolResult<T>
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the cache is bad initialized.
+    pub fn payload_as<T>(&self) -> ProtocolResult<&T>
     where
-        T: serde::de::DeserializeOwned,
+        T: serde::de::DeserializeOwned + Send + Sync + 'static,
     {
-        Ok(rmpv::ext::from_value(self.payload()?.clone())?)
+        if let Some(payload) = self.typed_payload_cache.get() {
+            if let Some(payload) = payload.downcast_ref::<T>() {
+                return Ok(payload);
+            }
+        }
+        let payload = rmp_serde::from_slice::<T>(&self.raw_payload_bytes())?;
+        let _ = self.typed_payload_cache.set(Arc::new(payload));
+        #[allow(clippy::expect_used)]
+        let payload = self
+            .typed_payload_cache
+            .get()
+            .expect("the payload always exists")
+            .downcast_ref::<T>()
+            .expect("the payload is always of the type T");
+        Ok(payload)
     }
 
     /// Get raw header bytes without parsing
@@ -195,15 +210,11 @@ impl Message {
     }
 
     /// Clear cached data to free memory
-    ///
-    /// # Panics
-    ///
-    /// Panics if the `RwLock` for `header_cache` or `payload_cache` is
-    /// poisoned.
     #[allow(clippy::unwrap_used)]
     pub fn clear_cache(&mut self) {
         let _ = self.header_cache.take();
         let _ = self.payload_cache.take();
+        let _ = self.typed_payload_cache.take();
     }
 
     /// Create a response message with the same correlation ID
@@ -397,7 +408,7 @@ impl<T: DeserializeOwned> TypedMessage<T> {
     /// Returns an error if header or payload parsing fails.
     pub fn from_message(message: &Message) -> ProtocolResult<Self> {
         let header = message.header()?.clone();
-        let payload = message.payload_as::<T>()?;
+        let payload = rmp_serde::from_slice::<T>(&message.raw_payload_bytes())?;
 
         Ok(TypedMessage {
             base_header: message.base_header.clone(),

@@ -180,9 +180,9 @@ fn demonstrate_lazy_parsing() -> ProtocolResult<()> {
     println!("    - Payload cached: {}", message.is_payload_cached());
 
     // Parse payload only when needed (lazy)
-    let parsed_chat: Option<ChatMessage> = message.payload_as()?;
+    let parsed_chat = message.payload_as::<ChatMessage>()?;
     println!("  💬 After accessing payload:");
-    println!("    - Message: {:?}", parsed_chat.unwrap().message);
+    println!("    - Message: {:?}", parsed_chat.message);
     println!("    - Header cached: {}", message.is_header_cached());
     println!("    - Payload cached: {}", message.is_payload_cached());
 

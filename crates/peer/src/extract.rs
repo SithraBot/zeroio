@@ -1,17 +1,18 @@
 use std::{
     convert::Infallible,
     marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use fleximq_protocol::{Header, Message, ProtocolError};
+use fleximq_protocol::{Header, Message, ProtocolError, types::BaseHeader};
 use futures_util::{future, ready};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 
 use crate::error::Error;
+
 pub trait FromMessage<'a>: Sized {
     type Error: Into<Error>;
     type Future: Future<Output = Result<Self, Self::Error>>;
@@ -105,38 +106,184 @@ impl<'a> FromMessage<'a> for &'a Header {
     }
 }
 
-pub struct Payload<T: DeserializeOwned>(T);
+pub struct Payload<'a, T>(&'a T)
+where
+    T: DeserializeOwned + Send + Sync + 'static;
 
-impl<T: DeserializeOwned> Payload<T> {
-    pub fn new(value: T) -> Self {
+impl<'a, T> Payload<'a, T>
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
+    pub fn new(value: &'a T) -> Self {
         Payload(value)
     }
+}
 
-    pub fn into_inner(self) -> T {
+impl<'a, T> Deref for Payload<'a, T>
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl<T: DeserializeOwned> Deref for Payload<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: DeserializeOwned> DerefMut for Payload<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T: DeserializeOwned> FromMessage<'_> for Payload<T> {
+impl<'a, T> FromMessage<'a> for Payload<'a, T>
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
     type Error = ProtocolError;
     type Future = future::Ready<Result<Self, Self::Error>>;
 
-    fn from_message(message: &Message) -> Self::Future {
+    fn from_message(message: &'a Message) -> Self::Future {
         let payload = message.payload_as::<T>();
         future::ready(payload.map(|value| Payload(value)))
     }
 }
+
+impl<'a> FromMessage<'a> for &'a rmpv::Value {
+    type Error = ProtocolError;
+    type Future = future::Ready<Result<Self, Self::Error>>;
+
+    fn from_message(message: &'a Message) -> Self::Future {
+        future::ready(message.payload())
+    }
+}
+
+impl<'a> FromMessage<'a> for &'a BaseHeader {
+    type Error = Infallible;
+    type Future = future::Ready<Result<Self, Self::Error>>;
+
+    fn from_message(message: &'a Message) -> Self::Future {
+        future::ready(Ok(&message.base_header))
+    }
+}
+
+mod tuple {
+    #![allow(non_snake_case)]
+    use super::*;
+    #[pin_project(project = ExtractProject, project_replace = ExtractReplaceProject)]
+    enum ExtractFuture<Fut, Res> {
+        Future {
+            #[pin]
+            fut: Fut,
+        },
+        Done {
+            output: Res,
+        },
+        Empty,
+    }
+
+    macro_rules! from_message_for_tuple {
+    (@impl) => {
+        impl FromMessage<'_> for () {
+            type Error = Infallible;
+            type Future = future::Ready<Result<Self, Self::Error>>;
+
+            fn from_message(_: &Message) -> Self::Future {
+                future::ok(())
+            }
+        }
+    };
+    (@impl $first_fut:ident, $first_t:ident; $($rest_fut:ident, $rest_t:ident;)*)=>{
+        from_message_for_tuple!(@inner $first_fut; $first_t $(, $rest_t)*);
+        from_message_for_tuple!(@impl $($rest_fut, $rest_t;)*);
+    };
+    (@inner $fut:ident; $($T:ident),*)=>{
+        #[allow(unused_parens)]
+        impl<'a, $($T),+> FromMessage<'a> for ($($T,)+)
+        where
+            $($T: FromMessage<'a>),+
+        {
+            type Error = Error;
+            type Future = $fut<'a, $($T),+>;
+
+            fn from_message(message: &'a Message) -> Self::Future {
+                $fut {
+                    $(
+                        $T: ExtractFuture::<$T::Future, $T>::Future {
+                            fut: $T::from_message(message),
+                        },
+                    )+
+                }
+            }
+        }
+        #[pin_project]
+        pub struct $fut<'a, $($T: FromMessage<'a>),+> {
+            $(
+                #[pin]
+                $T: ExtractFuture<$T::Future, $T>,
+            )+
+        }
+        impl<'a, $($T: FromMessage<'a>),+> Future for $fut<'a, $($T),+>
+        {
+            type Output = Result<($($T,)+), Error>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let mut this = self.project();
+
+                let mut ready = true;
+                $(
+                    match this.$T.as_mut().project() {
+                        ExtractProject::Future { fut } => match fut.poll(cx) {
+                            Poll::Ready(Ok(output)) => {
+                                let _ = this.$T.as_mut().project_replace(ExtractFuture::Done { output });
+                            },
+                            Poll::Ready(Err(err)) => return Poll::Ready(Err(err.into())),
+                            Poll::Pending => ready = false,
+                        },
+                        ExtractProject::Done { .. } => {},
+                        ExtractProject::Empty => unreachable!("FromMessage polled after finished"),
+                    }
+                )+
+
+                if ready {
+                    Poll::Ready(Ok(
+                        ($(
+                            match this.$T.project_replace(ExtractFuture::Empty) {
+                                ExtractReplaceProject::Done { output } => output,
+                                _ => unreachable!("FromMessage polled after finished"),
+                            },
+                        )+)
+                    ))
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+    }
+}
+
+    from_message_for_tuple!(@impl
+        FutureTuple26, A;
+        FutureTuple25, B;
+        FutureTuple24, C;
+        FutureTuple23, D;
+        FutureTuple22, E;
+        FutureTuple21, F;
+        FutureTuple20, G;
+        FutureTuple19, H;
+        FutureTuple18, I;
+        FutureTuple17, J;
+        FutureTuple16, K;
+        FutureTuple15, L;
+        FutureTuple14, M;
+        FutureTuple13, N;
+        FutureTuple12, O;
+        FutureTuple11, P;
+        FutureTuple10, Q;
+        FutureTuple9, R;
+        FutureTuple8, S;
+        FutureTuple7, T;
+        FutureTuple6, U;
+        FutureTuple5, V;
+        FutureTuple4, W;
+        FutureTuple3, X;
+        FutureTuple2, Y;
+        FutureTuple1, Z;
+    );
+}
+
+pub use tuple::*;

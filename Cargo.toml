@@ -69,7 +69,7 @@ cognitive_complexity = "warn"
 too_many_lines = "warn"
 similar_names = "warn"
 single_match_else = "warn"
-option_if_let_else = "warn"
+option_if_let_else = "allow"
 
 # Pedantic lints that make sense for a library
 explicit_iter_loop = "warn"
@@ -90,6 +90,9 @@ cast_sign_loss = "warn"
 module_name_repetitions = "allow"
 struct_excessive_bools = "allow"
 fn_params_excessive_bools = "allow"
+
+pedantic = "warn"
+nursery = "warn"
 
 [profile.dev]
 split-debuginfo = "unpacked"

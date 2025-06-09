@@ -8,13 +8,13 @@ pub trait Handler<Args>: Clone + 'static {
     fn handle(&self, args: Args) -> Self::Future;
 }
 
-macro_rules! handler {
+macro_rules! handler_for_tuple {
     (@impl) => {
-        handler!(@inner);
+        handler_for_tuple!(@inner);
     };
     (@impl $first:ident $(, $rest:ident)*)=>{
-        handler!(@inner $first $(, $rest)*);
-        handler!(@impl $($rest),*);
+        handler_for_tuple!(@inner $first $(, $rest)*);
+        handler_for_tuple!(@impl $($rest),*);
     };
     (@inner $($T:ident),*)=>{
         impl<Func, Fut, $($T),*> Handler<($($T,)*)> for Func
@@ -33,4 +33,4 @@ macro_rules! handler {
         }
     }
 }
-handler!(@impl A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+handler_for_tuple!(@impl A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
