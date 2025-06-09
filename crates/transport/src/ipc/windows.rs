@@ -49,7 +49,7 @@ impl PlatformListener {
         Ok(client)
     }
 
-    pub async fn close(&mut self, _path: &Path) -> TransportResult<()> {
+    pub async fn close(_path: &Path) -> TransportResult<()> {
         // Named pipe server closes when dropped
         Ok(())
     }
@@ -64,7 +64,7 @@ pub async fn connect(path: &Path, _config: &IpcConfig) -> TransportResult<Platfo
 }
 
 /// Create a Windows named pipe listener
-pub async fn listen(path: &Path, config: &IpcConfig) -> TransportResult<PlatformListener> {
+pub fn listen(path: &Path, config: &IpcConfig) -> TransportResult<PlatformListener> {
     let pipe_name = format_pipe_name(path);
 
     #[allow(clippy::cast_possible_truncation)]

@@ -22,7 +22,7 @@ pub struct MessageCodec {
 impl MessageCodec {
     /// Create a new codec with default limits
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             parser:         MessageParser::new(),
             max_frame_size: crate::constants::DEFAULT_MAX_MESSAGE_SIZE,
@@ -31,7 +31,7 @@ impl MessageCodec {
 
     /// Create a new codec with custom limits
     #[must_use]
-    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
         Self {
             parser:         MessageParser::with_limits(max_message_size, max_header_size),
             max_frame_size: max_message_size,
@@ -130,7 +130,7 @@ pub struct MessageDecoder {
 impl MessageDecoder {
     /// Create a new decoder with default limits
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             parser:         MessageParser::new(),
             max_frame_size: crate::constants::DEFAULT_MAX_MESSAGE_SIZE,
@@ -139,7 +139,7 @@ impl MessageDecoder {
 
     /// Create a new decoder with custom limits
     #[must_use]
-    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
         Self {
             parser:         MessageParser::with_limits(max_message_size, max_header_size),
             max_frame_size: max_message_size,
@@ -200,7 +200,7 @@ pub struct MessageEncoder {
 impl MessageEncoder {
     /// Create a new encoder with default limits
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             max_frame_size: crate::constants::DEFAULT_MAX_MESSAGE_SIZE,
         }
@@ -208,7 +208,7 @@ impl MessageEncoder {
 
     /// Create a new encoder with custom frame size limit
     #[must_use]
-    pub fn with_max_frame_size(max_frame_size: usize) -> Self {
+    pub const fn with_max_frame_size(max_frame_size: usize) -> Self {
         Self { max_frame_size }
     }
 }
@@ -266,9 +266,9 @@ pub mod utils {
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::Framed;
 
-    use super::*;
+    use super::{Message, MessageCodec, ProtocolError, ProtocolResult, RawMessage};
 
-    /// Create a framed stream/sink from a tokio AsyncRead + AsyncWrite
+    /// Create a framed stream/sink from a tokio `AsyncRead` + `AsyncWrite`
     pub fn framed<T>(io: T) -> Framed<T, MessageCodec>
     where
         T: tokio::io::AsyncRead + tokio::io::AsyncWrite,
@@ -358,6 +358,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_decoder_only() {
         let mut decoder = MessageDecoder::new();
 

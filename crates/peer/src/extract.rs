@@ -114,12 +114,12 @@ impl<'a, T> Payload<'a, T>
 where
     T: DeserializeOwned + Send + Sync + 'static,
 {
-    pub fn new(value: &'a T) -> Self {
+    pub const fn new(value: &'a T) -> Self {
         Payload(value)
     }
 }
 
-impl<'a, T> Deref for Payload<'a, T>
+impl<T> Deref for Payload<'_, T>
 where
     T: DeserializeOwned + Send + Sync + 'static,
 {
@@ -163,7 +163,7 @@ impl<'a> FromMessage<'a> for &'a BaseHeader {
 
 mod tuple {
     #![allow(non_snake_case)]
-    use super::*;
+    use super::{Context, Error, FromMessage, Infallible, Message, Pin, Poll, future, pin_project};
     #[pin_project(project = ExtractProject, project_replace = ExtractReplaceProject)]
     enum ExtractFuture<Fut, Res> {
         Future {

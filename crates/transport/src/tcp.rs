@@ -98,12 +98,12 @@ impl TcpTransport {
 
     /// Creates a new TCP transport with the specified configuration
     #[must_use]
-    pub fn with_config(config: TcpConfig) -> Self {
+    pub const fn with_config(config: TcpConfig) -> Self {
         Self { config }
     }
 
-    /// Applies the transport configuration to a TcpStream
-    async fn apply_config(&self, stream: TcpStream) -> TransportResult<TcpStream> {
+    /// Applies the transport configuration to a `TcpStream`
+    fn apply_config(&self, stream: TcpStream) -> TransportResult<TcpStream> {
         stream
             .set_nodelay(self.config.nodelay)
             .map_err(|e| TransportError::Io(format!("Failed to set TCP nodelay: {e}")))?;
@@ -180,7 +180,7 @@ pub struct TcpTransportStream {
 }
 
 impl TcpTransportStream {
-    /// Constructs a new TcpTransportStream
+    /// Constructs a new `TcpTransportStream`
     fn new(
         stream: TcpStream,
         local_addr: SocketAddr,
@@ -203,7 +203,7 @@ impl TcpTransportStream {
     }
 
     /// Get a reference to the underlying TCP stream
-    pub fn get_stream(&self) -> &TcpStream {
+    pub const fn get_stream(&self) -> &TcpStream {
         &self.stream
     }
 
@@ -368,10 +368,10 @@ impl TcpTransportStream {
 
 /// High-level message-based TCP transport
 ///
-/// This implementation wraps a framed transport stream with MessageCodec
+/// This implementation wraps a framed transport stream with `MessageCodec`
 /// to provide direct Message sending and receiving capabilities.
 pub struct TcpMessageTransport {
-    /// Framed transport using MessageCodec
+    /// Framed transport using `MessageCodec`
     framed: Framed<TcpTransportStream, MessageCodec>,
 }
 
@@ -484,7 +484,7 @@ impl TransportListener for TcpTransportListener {
             .map_err(|e| TransportError::Io(format!("Failed to get local address: {e}")))?;
 
         // Apply TCP configuration
-        let stream = self.transport.apply_config(stream).await?;
+        let stream = self.transport.apply_config(stream)?;
 
         Ok(TcpTransportStream::new(
             stream,
@@ -515,7 +515,7 @@ impl Transport for TcpTransport {
     /// Establishes a TCP connection to the specified URL.
     ///
     /// The URL must use the "tcp://" scheme and include a host and port.
-    /// For example: "tcp://127.0.0.1:8080" or "tcp://example.com:1234".
+    /// For example: "<tcp://127.0.0.1:8080>" or "<tcp://example.com:1234>".
     ///
     /// # Errors
     ///
@@ -565,7 +565,7 @@ impl Transport for TcpTransport {
         let remote_addr = stream.peer_addr()?;
 
         // Apply TCP configuration
-        let stream = self.apply_config(stream).await?;
+        let stream = self.apply_config(stream)?;
 
         Ok(TcpTransportStream::new(
             stream,
@@ -582,7 +582,7 @@ impl Transport for TcpTransport {
     /// Creates a TCP listener bound to the address specified in the URL.
     ///
     /// The URL must use the "tcp://" scheme and include a host and port to bind
-    /// to. For example: "tcp://0.0.0.0:8080" to listen on all interfaces,
+    /// to. For example: "<tcp://0.0.0.0:8080>" to listen on all interfaces,
     /// port 8080.
     ///
     /// # Errors
@@ -622,7 +622,7 @@ impl Transport for TcpTransport {
     }
 
     /// Returns the transport type name ("tcp").
-    fn transport_type(&self) -> &str {
+    fn transport_type(&self) -> &'static str {
         "tcp"
     }
 
@@ -683,7 +683,7 @@ mod tests {
     #[tokio::test]
     async fn test_tcp_config() {
         let config = TcpConfig::default();
-        assert_eq!(config.nodelay, true);
+        assert!(config.nodelay);
         assert_eq!(config.send_buffer_size, None);
         assert_eq!(config.recv_buffer_size, None);
         assert_eq!(
@@ -723,7 +723,7 @@ mod tests {
         // started by the test itself. For now, we'll accept that connections
         // might fail if no server is present.
         let target_url = "tcp://localhost:38080"; // Using a less common port to reduce conflict chance
-        println!("Attempting concurrent connections to {}", target_url);
+        println!("Attempting concurrent connections to {target_url}");
 
         for i in 0..5 {
             let transport_clone = Arc::clone(&transport);
@@ -732,14 +732,16 @@ mod tests {
             let handle = tokio::spawn(async move {
                 match transport_clone.connect(target_url).await {
                     Ok(mut stream) => {
-                        let mut count = success_count_clone.lock().await;
-                        *count += 1;
-                        println!("Connection {} succeeded.", i);
+                        {
+                            let mut count = success_count_clone.lock().await;
+                            *count += 1;
+                        }
+                        println!("Connection {i} succeeded.");
                         // Optionally, perform a quick operation like close
                         let _ = stream.close().await;
                     }
                     Err(e) => {
-                        println!("Connection {} failed: {:?}", i, e);
+                        println!("Connection {i} failed: {e:?}");
                     }
                 }
             });
@@ -750,16 +752,16 @@ mod tests {
         for handle in handles {
             let _ = handle.await;
         }
-
         let count = success_count.lock().await;
         println!(
-            "test_tcp_concurrent_connections: {} connections succeeded out of 5 to {}",
-            *count, target_url
+            "test_tcp_concurrent_connections: {} connections succeeded out of 5 to {target_url}",
+            *count
         );
         // We assert that the count is >= 0, as success depends on an external server or
         // loopback availability. In a controlled environment with a test
         // server, one would assert *count == 5.
         assert!(*count >= 0);
+        drop(count); // for clippy
     }
 
     #[tokio::test]
@@ -784,12 +786,11 @@ mod tests {
                 // local_addr() for TcpListener returns a SocketAddr string like
                 // "127.0.0.1:12345" or "[::1]:12345" It does not include the
                 // "tcp://" scheme.
-                println!("Listener local_addr: {}", addr);
+                println!("Listener local_addr: {addr}");
                 let socket_addr: Result<SocketAddr, _> = addr.parse();
                 assert!(
                     socket_addr.is_ok(),
-                    "local_addr '{}' should be a valid SocketAddr",
-                    addr
+                    "local_addr '{addr}' should be a valid SocketAddr",
                 );
                 if let Ok(sa) = socket_addr {
                     assert!(sa.port() > 0, "Port should be assigned by OS");
@@ -819,28 +820,21 @@ mod tests {
         match timeout(Duration::from_millis(200), connect_future).await {
             // Increased timeout slightly
             Ok(Ok(_stream)) => {
-                panic!(
-                    "Connection to {} unexpectedly succeeded within timeout",
-                    non_existent_host
-                );
+                panic!("Connection to {non_existent_host} unexpectedly succeeded within timeout",);
             }
             Ok(Err(e)) => {
                 // Connection attempt finished, but failed (e.g. connection refused, host not
                 // found)
-                println!(
-                    "Connection to {} failed as expected: {:?}",
-                    non_existent_host, e
-                );
+                println!("Connection to {non_existent_host} failed as expected: {e:?}");
                 assert!(
                     matches!(e, TransportError::Io(_))
                         || matches!(e, TransportError::ConnectionFailure(_)),
-                    "Expected Io or ConnectionFailure error, got {:?}",
-                    e
+                    "Expected Io or ConnectionFailure error, got {e:?}"
                 );
             }
             Err(_elapsed) => {
                 // Timeout elapsed before connect_future completed
-                println!("Connection to {} timed out as expected", non_existent_host);
+                println!("Connection to {non_existent_host} timed out as expected");
                 // This is the success case for the timeout test
             }
         }
@@ -862,7 +856,7 @@ mod tests {
         let result = transport.connect("tcp://nonexistent:8080").await;
         assert!(matches!(
             result,
-            Err(TransportError::ConnectionFailure(_)) | Err(TransportError::Io(_))
+            Err(TransportError::ConnectionFailure(_) | TransportError::Io(_))
         ));
     }
 } // End of tests module

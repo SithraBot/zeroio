@@ -67,7 +67,7 @@ where
     }
 
     /// Get a reference to the underlying stream
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.stream
     }
 
@@ -154,7 +154,7 @@ where
     }
 }
 
-/// Extension trait to add message reading/writing to any TransportStream
+/// Extension trait to add message reading/writing to any `TransportStream`
 #[async_trait]
 pub trait MessageStreamExt: TransportStream {
     /// Read a protocol message from the stream
@@ -229,7 +229,7 @@ impl<'a, S: TransportStream> StreamBorrow<'a, S> {
 }
 
 #[async_trait]
-impl<'a, S: TransportStream> TransportStream for StreamBorrow<'a, S> {
+impl<S: TransportStream> TransportStream for StreamBorrow<'_, S> {
     fn connection_info(&self) -> &crate::traits::ConnectionInfo {
         self.stream.connection_info()
     }
@@ -247,7 +247,7 @@ impl<'a, S: TransportStream> TransportStream for StreamBorrow<'a, S> {
     }
 }
 
-impl<'a, S: TransportStream> AsyncRead for StreamBorrow<'a, S> {
+impl<S: TransportStream> AsyncRead for StreamBorrow<'_, S> {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -258,7 +258,7 @@ impl<'a, S: TransportStream> AsyncRead for StreamBorrow<'a, S> {
     }
 }
 
-impl<'a, S: TransportStream> AsyncWrite for StreamBorrow<'a, S> {
+impl<S: TransportStream> AsyncWrite for StreamBorrow<'_, S> {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -285,14 +285,14 @@ impl<'a, S: TransportStream> AsyncWrite for StreamBorrow<'a, S> {
     }
 }
 
-/// Creates a MessageTransportAdapter from any TransportStream
+/// Creates a `MessageTransportAdapter` from any `TransportStream`
 pub fn message_transport<S: TransportStream>(stream: S) -> MessageTransportAdapter<S> {
     MessageTransportAdapter::new(stream)
 }
 
 /// Utility function to convert a protocol error to a transport error
 #[must_use]
-pub fn protocol_error_to_transport(err: ProtocolError) -> TransportError {
+pub const fn protocol_error_to_transport(err: ProtocolError) -> TransportError {
     TransportError::Protocol(err)
 }
 
@@ -401,6 +401,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::similar_names)]
     async fn test_message_transport_adapter() {
         let (mut client, mut server) = MockTransportStream::new();
 

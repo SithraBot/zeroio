@@ -6,7 +6,7 @@ use thiserror::Error;
 pub type ProtocolResult<T> = Result<T, ProtocolError>;
 
 /// Protocol errors
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolError {
     /// Invalid protocol version
     #[error("Invalid protocol version: expected {expected}, got {actual}")]
@@ -28,7 +28,7 @@ pub enum ProtocolError {
     #[error("Header size {size} exceeds maximum {max}")]
     HeaderTooLarge { size: usize, max: usize },
 
-    /// Invalid ClientID
+    /// Invalid `ClientID`
     #[error("Invalid ClientID: {0}")]
     InvalidClientId(u32),
 
@@ -46,11 +46,11 @@ pub enum ProtocolError {
         message_type: String,
     },
 
-    /// MessagePack serialization error
+    /// `MessagePack` serialization error
     #[error("MessagePack serialization error: {0}")]
     MessagePackSerialization(String),
 
-    /// MessagePack deserialization error
+    /// `MessagePack` deserialization error
     #[error("MessagePack deserialization error: {0}")]
     MessagePackDeserialization(String),
 
@@ -81,24 +81,24 @@ pub enum ProtocolError {
 
 impl From<rmp_serde::encode::Error> for ProtocolError {
     fn from(err: rmp_serde::encode::Error) -> Self {
-        ProtocolError::MessagePackSerialization(err.to_string())
+        Self::MessagePackSerialization(err.to_string())
     }
 }
 
 impl From<rmp_serde::decode::Error> for ProtocolError {
     fn from(err: rmp_serde::decode::Error) -> Self {
-        ProtocolError::MessagePackDeserialization(err.to_string())
+        Self::MessagePackDeserialization(err.to_string())
     }
 }
 
 impl From<std::io::Error> for ProtocolError {
     fn from(err: std::io::Error) -> Self {
-        ProtocolError::Io(err.to_string())
+        Self::Io(err.to_string())
     }
 }
 
 impl From<rmpv::ext::Error> for ProtocolError {
     fn from(err: rmpv::ext::Error) -> Self {
-        ProtocolError::MessagePackDeserialization(err.to_string())
+        Self::MessagePackDeserialization(err.to_string())
     }
 }

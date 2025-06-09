@@ -9,7 +9,10 @@ use nom::{
 };
 
 use crate::{
-    constants::*,
+    constants::{
+        BASE_HEADER_SIZE, DEFAULT_MAX_HEADER_SIZE, DEFAULT_MAX_MESSAGE_SIZE, PROTOCOL_VERSION,
+        RESERVED_SIZE,
+    },
     errors::{ProtocolError, ProtocolResult},
     types::{BaseHeader, MessageType},
 };
@@ -145,14 +148,14 @@ pub struct MessageParser {
 impl MessageParser {
     /// Create a new streaming message parser
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::with_limits(DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_HEADER_SIZE)
     }
 
     /// Create a new parser with custom size limits
     #[must_use]
-    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
-        MessageParser {
+    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+        Self {
             buffer: Vec::new(),
             max_message_size,
             max_header_size,
@@ -287,7 +290,13 @@ pub fn validate_message_structure(
     message_type: MessageType,
     header: &crate::types::Header,
 ) -> ProtocolResult<()> {
-    use crate::types::{HeaderField, MessageType::*};
+    use crate::types::{
+        HeaderField,
+        MessageType::{
+            Broadcast, Join, Notification, Ping, Pong, Publish, Request, Response, Subscribe,
+            Unsubscribe,
+        },
+    };
 
     // Define required and forbidden fields for each message type
     let (required, forbidden) = match message_type {
@@ -301,11 +310,7 @@ pub fn validate_message_structure(
                 HeaderField::Status,
             ],
         ),
-        Request => (
-            vec![HeaderField::Routing, HeaderField::Reqrep],
-            vec![HeaderField::Topic, HeaderField::Auth, HeaderField::Keepalive],
-        ),
-        Response => (
+        Request | Response => (
             vec![HeaderField::Routing, HeaderField::Reqrep],
             vec![HeaderField::Topic, HeaderField::Auth, HeaderField::Keepalive],
         ),
@@ -332,7 +337,7 @@ pub fn validate_message_structure(
             vec![HeaderField::Topic],
             vec![HeaderField::Reqrep, HeaderField::Auth, HeaderField::Keepalive],
         ),
-        Subscribe => (
+        Subscribe | Unsubscribe => (
             vec![HeaderField::Topic],
             vec![
                 HeaderField::Routing,
@@ -342,27 +347,7 @@ pub fn validate_message_structure(
                 HeaderField::Keepalive,
             ],
         ),
-        Unsubscribe => (
-            vec![HeaderField::Topic],
-            vec![
-                HeaderField::Routing,
-                HeaderField::Reqrep,
-                HeaderField::Status,
-                HeaderField::Auth,
-                HeaderField::Keepalive,
-            ],
-        ),
-        Ping => (
-            vec![HeaderField::Keepalive],
-            vec![
-                HeaderField::Routing,
-                HeaderField::Reqrep,
-                HeaderField::Topic,
-                HeaderField::Status,
-                HeaderField::Auth,
-            ],
-        ),
-        Pong => (
+        Ping | Pong => (
             vec![HeaderField::Keepalive],
             vec![
                 HeaderField::Routing,

@@ -24,7 +24,7 @@ impl MessageBuilder {
     /// Create a new message builder
     #[must_use]
     pub fn new(message_type: MessageType, client_id: ClientId) -> Self {
-        MessageBuilder {
+        Self {
             message_type,
             client_id,
             header: Header::new(),
@@ -54,7 +54,7 @@ impl MessageBuilder {
         self
     }
 
-    /// Add a route with client_name, path, and client_id to the header
+    /// Add a route with `client_name`, path, and `client_id` to the header
     #[must_use]
     pub fn route_with_id(
         mut self,
@@ -165,14 +165,14 @@ impl MessageBuilder {
 
     /// Set status code
     #[must_use]
-    pub fn status(mut self, status: StatusCode) -> Self {
+    pub const fn status(mut self, status: StatusCode) -> Self {
         self.header.status = Some(status);
         self
     }
 
     /// Set status code (alias for status)
     #[must_use]
-    pub fn with_status(self, status: StatusCode) -> Self {
+    pub const fn with_status(self, status: StatusCode) -> Self {
         self.status(status)
     }
 
@@ -220,7 +220,7 @@ impl MessageBuilder {
 
     /// Set keep-alive information
     #[must_use]
-    pub fn keepalive(mut self, keepalive: KeepAlive) -> Self {
+    pub const fn keepalive(mut self, keepalive: KeepAlive) -> Self {
         self.header.keepalive = Some(keepalive);
         self
     }
@@ -241,7 +241,7 @@ impl MessageBuilder {
 
     /// Set keep-alive for PONG response
     #[must_use]
-    pub fn pong(mut self, ping_timestamp: u64) -> Self {
+    pub const fn pong(mut self, ping_timestamp: u64) -> Self {
         self.header.keepalive = Some(KeepAlive {
             timestamp: ping_timestamp,
             interval:  None,
@@ -525,6 +525,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_ping_pong_builder() {
         let ping = MessageBuilder::new(MessageType::Ping, 1000).ping().build().unwrap();
 

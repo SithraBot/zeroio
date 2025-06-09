@@ -66,7 +66,7 @@ impl Message {
             });
         }
 
-        Ok(Message {
+        Ok(Self {
             base_header,
             raw_data: data,
             header_cache: OnceCell::new(),
@@ -76,22 +76,22 @@ impl Message {
     }
 
     /// Get the message type
-    pub fn message_type(&self) -> MessageType {
+    pub const fn message_type(&self) -> MessageType {
         self.base_header.message_type
     }
 
     /// Get the client ID
-    pub fn client_id(&self) -> ClientId {
+    pub const fn client_id(&self) -> ClientId {
         self.base_header.client_id
     }
 
     /// Get the header length
-    pub fn header_length(&self) -> u32 {
+    pub const fn header_length(&self) -> u32 {
         self.base_header.header_length
     }
 
     /// Get the payload length
-    pub fn payload_length(&self) -> u64 {
+    pub const fn payload_length(&self) -> u64 {
         self.base_header.payload_length
     }
 
@@ -101,7 +101,7 @@ impl Message {
     }
 
     /// Get the raw message bytes
-    pub fn raw_bytes(&self) -> &Bytes {
+    pub const fn raw_bytes(&self) -> &Bytes {
         &self.raw_data
     }
 
@@ -127,7 +127,7 @@ impl Message {
 
     /// Parse and cache the payload if not already cached
     ///
-    /// Returns the raw MessagePack value for maximum flexibility.
+    /// Returns the raw `MessagePack` value for maximum flexibility.
     /// Users can deserialize to specific types as needed.
     ///
     /// # Errors
@@ -152,9 +152,9 @@ impl Message {
     /// # Errors
     ///
     /// Returns an error if payload deserialization fails.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the cache is bad initialized.
     pub fn payload_as<T>(&self) -> ProtocolResult<&T>
     where
@@ -309,7 +309,7 @@ impl RawMessage {
             Bytes::from(bytes.into_inner())
         };
 
-        Ok(RawMessage {
+        Ok(Self {
             message_type,
             client_id,
             header,
@@ -410,7 +410,7 @@ impl<T: DeserializeOwned> TypedMessage<T> {
         let header = message.header()?.clone();
         let payload = rmp_serde::from_slice::<T>(&message.raw_payload_bytes())?;
 
-        Ok(TypedMessage {
+        Ok(Self {
             base_header: message.base_header.clone(),
             header,
             payload,

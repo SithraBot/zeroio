@@ -38,7 +38,7 @@ pub struct IpcTransport {
 #[derive(Debug, Clone)]
 pub struct IpcConfig {
     /// Buffer size for IPC communication (usize). Will be cast to u32 for some
-    /// internal uses. Ensure this value does not exceed u32::MAX if
+    /// internal uses. Ensure this value does not exceed `u32::MAX` if
     /// truncation is a concern.
     pub buffer_size: usize,
     /// Max pending connections for listener
@@ -71,7 +71,7 @@ impl IpcTransport {
 
     /// Creates a new IPC transport with the specified configuration.
     #[must_use]
-    pub fn with_config(config: IpcConfig) -> Self {
+    pub const fn with_config(config: IpcConfig) -> Self {
         Self { config }
     }
 
@@ -90,10 +90,10 @@ impl IpcTransport {
         let path_str = parsed.host_str().map_or_else(
             || parsed.path().to_string(),
             |host| {
-                if !host.is_empty() {
-                    format!("{}{}", host, parsed.path())
-                } else {
+                if host.is_empty() {
                     parsed.path().to_string()
+                } else {
+                    format!("{}{}", host, parsed.path())
                 }
             },
         );
@@ -107,7 +107,7 @@ impl IpcTransport {
         // Remove leading slash if present for cross-platform compatibility
         let normalized_path = path_str
             .strip_prefix('/')
-            .map_or_else(|| path_str.to_string(), |stripped| stripped.to_string());
+            .map_or_else(|| path_str.to_string(), std::string::ToString::to_string);
 
         // Platform-specific path processing
         let final_path = PlatformAdapter::normalize_path(&normalized_path);
@@ -210,7 +210,8 @@ impl TransportListener for IpcTransportListener {
     }
 
     async fn close(&mut self) -> TransportResult<()> {
-        self.inner.close(&self.path).await
+        PlatformListener::close(&self.path);
+        Ok(())
     }
 }
 
@@ -267,7 +268,7 @@ impl Transport for IpcTransport {
         url: &str,
     ) -> TransportResult<Box<dyn TransportListener<Stream = Self::Stream>>> {
         let path = Self::parse_path(url)?;
-        let listener = PlatformAdapter::listen(&path, &self.config).await?;
+        let listener = PlatformAdapter::listen(&path, &self.config)?;
 
         Ok(Box::new(IpcTransportListener {
             inner: listener,
@@ -275,7 +276,7 @@ impl Transport for IpcTransport {
         }))
     }
 
-    fn transport_type(&self) -> &str {
+    fn transport_type(&self) -> &'static str {
         "ipc"
     }
 
@@ -297,16 +298,16 @@ impl PlatformAdapter {
         }
     }
 
-    async fn listen(path: &Path, config: &IpcConfig) -> TransportResult<PlatformListener> {
+    fn listen(path: &Path, config: &IpcConfig) -> TransportResult<PlatformListener> {
         #[cfg(unix)]
         {
             let _ = config; // Suppress unused variable warning on Unix
-            unix::listen(path).await
+            unix::listen(path)
         }
 
         #[cfg(windows)]
         {
-            windows::listen(path, config).await
+            windows::listen(path, config)
         }
     }
 }
@@ -399,21 +400,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ipc_message_exchange() {
-        // With the new architecture, this test would require actual IPC setup
-        // which is covered in the integration tests
-        println!("test_ipc_message_exchange: Covered by integration tests");
-        assert!(true);
-    }
-
-    #[tokio::test]
-    async fn test_ipc_close() {
-        // Covered by integration tests with real connections
-        println!("test_ipc_close: Covered by integration tests");
-        assert!(true);
-    }
-
-    #[tokio::test]
     async fn test_ipc_concurrent_connections() {
         let transport = Arc::new(IpcTransport::new());
         let mut handles = vec![];
@@ -469,8 +455,10 @@ mod tests {
 
                 match transport_clone.connect(&socket_url_clone).await {
                     Ok(mut stream) => {
-                        let mut count = success_count_clone.lock().await;
-                        *count += 1;
+                        {
+                            let mut count = success_count_clone.lock().await;
+                            *count += 1;
+                        }
                         stream.close().await.ok();
                     }
                     Err(_e) => {
@@ -546,7 +534,7 @@ mod tests {
             format!("ipc://test_listener_{}", timestamp)
         };
 
-        println!("Testing IPC listener with URL: {}", socket_url);
+        println!("Testing IPC listener with URL: {socket_url}");
 
         // Test listener creation
         let listener_result = transport.listen(&socket_url).await;
@@ -567,15 +555,13 @@ mod tests {
             );
 
             if let Ok(addr) = addr_result {
-                println!("Listener local_addr: {}", addr);
+                println!("Listener local_addr: {addr}");
                 // Check path matching on Unix
                 #[cfg(unix)]
                 {
                     assert!(
                         addr.contains(&expected_path),
-                        "local_addr '{}' does not contain expected path '{}'",
-                        addr,
-                        expected_path
+                        "local_addr '{addr}' does not contain expected path '{expected_path}'",
                     );
                 }
             }

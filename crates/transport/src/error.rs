@@ -83,7 +83,7 @@ pub enum TransportError {
     Other(String),
 }
 
-/// Implement From<io::Error> for TransportError
+/// Implement From<io::Error> for `TransportError`
 impl From<io::Error> for TransportError {
     fn from(err: io::Error) -> Self {
         match err.kind() {
@@ -91,8 +91,9 @@ impl From<io::Error> for TransportError {
             io::ErrorKind::ConnectionRefused => {
                 Self::ConnectionFailure("Connection refused".to_string())
             }
-            io::ErrorKind::ConnectionReset => Self::ConnectionDropped,
-            io::ErrorKind::ConnectionAborted => Self::ConnectionDropped,
+            io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted => {
+                Self::ConnectionDropped
+            }
             io::ErrorKind::NotConnected => Self::ConnectionClosed,
             io::ErrorKind::WouldBlock => {
                 Self::ResourceUnavailable("Operation would block".to_string())
@@ -103,19 +104,18 @@ impl From<io::Error> for TransportError {
     }
 }
 
-/// Implement From<url::ParseError> for TransportError
+/// Implement From<url::ParseError> for `TransportError`
 impl From<url::ParseError> for TransportError {
     fn from(err: url::ParseError) -> Self {
         Self::InvalidUrl(err.to_string())
     }
 }
 
-/// Implement From<tokio_tungstenite::tungstenite::Error> for TransportError
+/// Implement From<`tokio_tungstenite::tungstenite::Error`> for `TransportError`
 impl From<WsError> for TransportError {
     fn from(err: WsError) -> Self {
         match err {
-            WsError::ConnectionClosed => Self::ConnectionClosed,
-            WsError::AlreadyClosed => Self::ConnectionClosed,
+            WsError::ConnectionClosed | WsError::AlreadyClosed => Self::ConnectionClosed,
             WsError::Io(io_err) => Self::from(io_err),
             WsError::Tls(tls_err) => Self::WebSocket(format!("TLS error: {tls_err}")),
             WsError::Capacity(_) => Self::MessageTooLarge {
@@ -138,14 +138,14 @@ impl From<WsError> for TransportError {
 
 /// Timeout error conversion helper
 #[must_use]
-pub fn timeout_error(duration: Duration) -> TransportError {
+pub const fn timeout_error(duration: Duration) -> TransportError {
     TransportError::Timeout(duration)
 }
 
-/// Alias for Result with TransportError
+/// Alias for Result with `TransportError`
 pub type TransportResult<T> = std::result::Result<T, TransportError>;
 
-/// Handy extension trait for TransportResult
+/// Handy extension trait for `TransportResult`
 pub trait TransportResultExt<T> {
     /// Map an error to a different error message
     ///
@@ -175,7 +175,7 @@ pub trait TransportResultExt<T> {
 }
 
 impl<T> TransportResultExt<T> for TransportResult<T> {
-    fn with_context<F, C>(self, context: F) -> TransportResult<T>
+    fn with_context<F, C>(self, context: F) -> Self
     where
         F: FnOnce() -> C,
         C: Into<String>,
@@ -197,7 +197,7 @@ impl<T> TransportResultExt<T> for TransportResult<T> {
         transport_type: &str,
         local: Option<&str>,
         remote: Option<&str>,
-    ) -> TransportResult<T> {
+    ) -> Self {
         self.map_err(|err| {
             let conn_info = match (local, remote) {
                 (Some(l), Some(r)) => format!("[{transport_type} {l}->{r}]"),

@@ -32,42 +32,42 @@ pub enum MessageType {
 impl MessageType {
     /// Convert from u8, returning None for unknown values
     #[must_use]
-    pub fn from_u8(value: u8) -> Option<Self> {
+    pub const fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0 => Some(MessageType::Join),
-            1 => Some(MessageType::Request),
-            2 => Some(MessageType::Response),
-            3 => Some(MessageType::Notification),
-            4 => Some(MessageType::Broadcast),
-            5 => Some(MessageType::Publish),
-            6 => Some(MessageType::Subscribe),
-            7 => Some(MessageType::Unsubscribe),
-            8 => Some(MessageType::Ping),
-            9 => Some(MessageType::Pong),
+            0 => Some(Self::Join),
+            1 => Some(Self::Request),
+            2 => Some(Self::Response),
+            3 => Some(Self::Notification),
+            4 => Some(Self::Broadcast),
+            5 => Some(Self::Publish),
+            6 => Some(Self::Subscribe),
+            7 => Some(Self::Unsubscribe),
+            8 => Some(Self::Ping),
+            9 => Some(Self::Pong),
             _ => None,
         }
     }
 
     /// Convert to u8
     #[must_use]
-    pub fn to_u8(self) -> u8 {
+    pub const fn to_u8(self) -> u8 {
         self as u8
     }
 
     /// Get the string representation for error messages
     #[must_use]
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            MessageType::Join => "JOIN",
-            MessageType::Request => "REQ",
-            MessageType::Response => "REP",
-            MessageType::Notification => "NOTIF",
-            MessageType::Broadcast => "BCAST",
-            MessageType::Publish => "PUB",
-            MessageType::Subscribe => "SUB",
-            MessageType::Unsubscribe => "UNSUB",
-            MessageType::Ping => "PING",
-            MessageType::Pong => "PONG",
+            Self::Join => "JOIN",
+            Self::Request => "REQ",
+            Self::Response => "REP",
+            Self::Notification => "NOTIF",
+            Self::Broadcast => "BCAST",
+            Self::Publish => "PUB",
+            Self::Subscribe => "SUB",
+            Self::Unsubscribe => "UNSUB",
+            Self::Ping => "PING",
+            Self::Pong => "PONG",
         }
     }
 }
@@ -77,34 +77,34 @@ impl MessageType {
 pub struct StatusCode(pub u16);
 
 impl StatusCode {
-    pub const ACCEPTED: StatusCode = StatusCode(202);
-    pub const AUTHENTICATION_FAILED: StatusCode = StatusCode(604);
-    pub const BAD_GATEWAY: StatusCode = StatusCode(502);
+    pub const ACCEPTED: Self = Self(202);
+    pub const AUTHENTICATION_FAILED: Self = Self(604);
+    pub const BAD_GATEWAY: Self = Self(502);
     // Client error codes (400-499)
-    pub const BAD_REQUEST: StatusCode = StatusCode(400);
+    pub const BAD_REQUEST: Self = Self(400);
     // Protocol specific codes (600-699)
-    pub const CLIENT_NOT_FOUND: StatusCode = StatusCode(600);
-    pub const CONFLICT: StatusCode = StatusCode(409);
-    pub const CREATED: StatusCode = StatusCode(201);
-    pub const FORBIDDEN: StatusCode = StatusCode(403);
-    pub const GATEWAY_TIMEOUT: StatusCode = StatusCode(504);
+    pub const CLIENT_NOT_FOUND: Self = Self(600);
+    pub const CONFLICT: Self = Self(409);
+    pub const CREATED: Self = Self(201);
+    pub const FORBIDDEN: Self = Self(403);
+    pub const GATEWAY_TIMEOUT: Self = Self(504);
     // Server error codes (500-599)
-    pub const INTERNAL_SERVER_ERROR: StatusCode = StatusCode(500);
-    pub const INVALID_ROUTING: StatusCode = StatusCode(602);
-    pub const JOIN_REJECTED: StatusCode = StatusCode(605);
-    pub const METHOD_NOT_ALLOWED: StatusCode = StatusCode(405);
-    pub const NOT_FOUND: StatusCode = StatusCode(404);
-    pub const NOT_IMPLEMENTED: StatusCode = StatusCode(501);
-    pub const NO_CONTENT: StatusCode = StatusCode(204);
+    pub const INTERNAL_SERVER_ERROR: Self = Self(500);
+    pub const INVALID_ROUTING: Self = Self(602);
+    pub const JOIN_REJECTED: Self = Self(605);
+    pub const METHOD_NOT_ALLOWED: Self = Self(405);
+    pub const NOT_FOUND: Self = Self(404);
+    pub const NOT_IMPLEMENTED: Self = Self(501);
+    pub const NO_CONTENT: Self = Self(204);
     // Success codes (200-299)
-    pub const OK: StatusCode = StatusCode(200);
-    pub const PAYLOAD_TOO_LARGE: StatusCode = StatusCode(413);
-    pub const REQUEST_TIMEOUT: StatusCode = StatusCode(408);
-    pub const SERVICE_UNAVAILABLE: StatusCode = StatusCode(503);
-    pub const SUBSCRIPTION_FAILED: StatusCode = StatusCode(603);
-    pub const TOO_MANY_REQUESTS: StatusCode = StatusCode(429);
-    pub const TOPIC_NOT_FOUND: StatusCode = StatusCode(601);
-    pub const UNAUTHORIZED: StatusCode = StatusCode(401);
+    pub const OK: Self = Self(200);
+    pub const PAYLOAD_TOO_LARGE: Self = Self(413);
+    pub const REQUEST_TIMEOUT: Self = Self(408);
+    pub const SERVICE_UNAVAILABLE: Self = Self(503);
+    pub const SUBSCRIPTION_FAILED: Self = Self(603);
+    pub const TOO_MANY_REQUESTS: Self = Self(429);
+    pub const TOPIC_NOT_FOUND: Self = Self(601);
+    pub const UNAUTHORIZED: Self = Self(401);
 
     /// Check if this is a success status (200-299)
     #[must_use]
@@ -173,7 +173,7 @@ impl KeepAlive {
         let timestamp =
             SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
 
-        KeepAlive {
+        Self {
             timestamp,
             interval: None,
         }
@@ -223,7 +223,7 @@ pub enum AuthCredentials {
 impl Auth {
     /// Create token authentication
     pub fn token(token: impl Into<String>) -> Self {
-        Auth {
+        Self {
             auth_type:   AuthType::Token,
             credentials: AuthCredentials::Token {
                 token: token.into(),
@@ -233,7 +233,7 @@ impl Auth {
 
     /// Create basic authentication
     pub fn basic(username: impl Into<String>, password: impl Into<String>) -> Self {
-        Auth {
+        Self {
             auth_type:   AuthType::Basic,
             credentials: AuthCredentials::Basic {
                 username: username.into(),
@@ -244,7 +244,7 @@ impl Auth {
 
     /// Create API key authentication
     pub fn api_key(api_key: impl Into<String>) -> Self {
-        Auth {
+        Self {
             auth_type:   AuthType::ApiKey,
             credentials: AuthCredentials::ApiKey {
                 api_key: api_key.into(),
@@ -287,7 +287,7 @@ impl Header {
     /// Create an empty header
     #[must_use]
     pub fn new() -> Self {
-        Header {
+        Self {
             routing:     None,
             reqrep:      None,
             topic:       None,
@@ -349,7 +349,7 @@ impl Header {
 
     /// Add status code
     #[must_use]
-    pub fn with_status(mut self, status: StatusCode) -> Self {
+    pub const fn with_status(mut self, status: StatusCode) -> Self {
         self.status = Some(status);
         self
     }
@@ -363,7 +363,7 @@ impl Header {
 
     /// Add keep-alive information
     #[must_use]
-    pub fn with_keepalive(mut self, keepalive: KeepAlive) -> Self {
+    pub const fn with_keepalive(mut self, keepalive: KeepAlive) -> Self {
         self.keepalive = Some(keepalive);
         self
     }
@@ -397,29 +397,29 @@ pub enum HeaderField {
 impl HeaderField {
     /// Get field name as string
     #[must_use]
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
-            HeaderField::Routing => "routing",
-            HeaderField::Reqrep => "reqrep",
-            HeaderField::Topic => "topic",
-            HeaderField::Status => "status",
-            HeaderField::Auth => "auth",
-            HeaderField::Keepalive => "keepalive",
-            HeaderField::ClientName => "client_name",
+            Self::Routing => "routing",
+            Self::Reqrep => "reqrep",
+            Self::Topic => "topic",
+            Self::Status => "status",
+            Self::Auth => "auth",
+            Self::Keepalive => "keepalive",
+            Self::ClientName => "client_name",
         }
     }
 
     /// Check if field is present in header
     #[must_use]
-    pub fn is_present_in(&self, header: &Header) -> bool {
+    pub const fn is_present_in(&self, header: &Header) -> bool {
         match self {
-            HeaderField::Routing => header.routing.is_some(),
-            HeaderField::Reqrep => header.reqrep.is_some(),
-            HeaderField::Topic => header.topic.is_some(),
-            HeaderField::Status => header.status.is_some(),
-            HeaderField::Auth => header.auth.is_some(),
-            HeaderField::Keepalive => header.keepalive.is_some(),
-            HeaderField::ClientName => header.client_name.is_some(),
+            Self::Routing => header.routing.is_some(),
+            Self::Reqrep => header.reqrep.is_some(),
+            Self::Topic => header.topic.is_some(),
+            Self::Status => header.status.is_some(),
+            Self::Auth => header.auth.is_some(),
+            Self::Keepalive => header.keepalive.is_some(),
+            Self::ClientName => header.client_name.is_some(),
         }
     }
 }
@@ -438,13 +438,13 @@ pub struct BaseHeader {
 impl BaseHeader {
     /// Create a new base header
     #[must_use]
-    pub fn new(
+    pub const fn new(
         message_type: MessageType,
         client_id: ClientId,
         header_length: u32,
         payload_length: u64,
     ) -> Self {
-        BaseHeader {
+        Self {
             version: crate::constants::PROTOCOL_VERSION,
             message_type,
             client_id,

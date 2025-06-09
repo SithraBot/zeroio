@@ -72,21 +72,21 @@ where
 }
 
 impl TransportManager {
-    /// Creates a new TransportManager with connection tracking enabled
+    /// Creates a new `TransportManager` with connection tracking enabled
     #[must_use]
     pub fn new() -> Self {
         Self::with_cache_config(100, Duration::from_secs(300))
     }
 
-    /// Creates a new TransportManager with specified cache configuration
+    /// Creates a new `TransportManager` with specified cache configuration
     ///
     /// # Panics
     ///
-    /// Will panic if cache_size is 0, but this is handled by using a safe
+    /// Will panic if `cache_size` is 0, but this is handled by using a safe
     /// fallback value
     #[must_use]
     pub fn with_cache_config(cache_size: usize, ttl: Duration) -> Self {
-        let mut manager = Self {
+        let manager = Self {
             transports:       DashMap::new(),
             connection_stats: Arc::new(Mutex::new(LruCache::new(
                 std::num::NonZeroUsize::new(cache_size.max(1)).unwrap_or_else(|| {
@@ -103,7 +103,7 @@ impl TransportManager {
     }
 
     /// Register instances of the default built-in transports
-    fn register_default_transports(&mut self) {
+    fn register_default_transports(&self) {
         // TCP transport
         self.register_transport(Arc::new(TypeErasedTransport {
             inner: TcpTransport::new(),
@@ -347,7 +347,9 @@ mod tests {
 
         let stats = manager.cache_stats();
         assert_eq!(stats.size, 1);
-        assert_eq!(stats.utilization(), 0.01); // 1/100
+        #[allow(clippy::float_cmp)]
+        let value = stats.utilization() == 0.01f64; // 1/100
+        assert!(value);
     }
 
     #[tokio::test]

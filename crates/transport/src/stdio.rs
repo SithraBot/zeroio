@@ -57,7 +57,7 @@ impl StdioTransport {
     /// Creates a new STDIO transport with the specified subprocess
     /// configuration.
     #[must_use]
-    pub fn with_config(config: StdioConfig) -> Self {
+    pub const fn with_config(config: StdioConfig) -> Self {
         Self { config }
     }
 
@@ -86,7 +86,7 @@ pub struct StdioTransportStream {
 }
 
 impl StdioTransportStream {
-    /// Constructs a new StdioTransportStream from a spawned child process.
+    /// Constructs a new `StdioTransportStream` from a spawned child process.
     fn new(mut child: Child, command: &str) -> TransportResult<Self> {
         let stdin = child
             .stdin
@@ -254,8 +254,8 @@ impl Transport for StdioTransport {
     ///   `StdioTransport::config` is used. If no command is configured,
     ///   `TransportError::InvalidUrl` is returned.
     /// - If `url` starts with "stdio://" followed by a command and arguments
-    ///   (e.g., "stdio://my_command --arg1 value1"), that command is executed,
-    ///   overriding any configured command.
+    ///   (e.g., "<stdio://my_command> --arg1 value1"), that command is
+    ///   executed, overriding any configured command.
     /// - Otherwise, `TransportError::InvalidUrl` is returned.
     ///
     /// The subprocess's stderr is inherited by the parent process.
@@ -293,7 +293,7 @@ impl Transport for StdioTransport {
             }
             (
                 parts[0].to_string(),
-                parts[1..].iter().map(|s| s.to_string()).collect(),
+                parts[1..].iter().map(|s| (*s).to_string()).collect(),
             )
         } else {
             return Err(TransportError::InvalidUrl(format!(
@@ -347,7 +347,7 @@ impl Transport for StdioTransport {
     }
 
     /// Returns the transport type name ("stdio").
-    fn transport_type(&self) -> &str {
+    fn transport_type(&self) -> &'static str {
         "stdio"
     }
 

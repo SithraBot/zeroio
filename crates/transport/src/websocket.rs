@@ -59,7 +59,7 @@ impl WebSocketTransport {
 
     /// Creates a new WebSocket transport with the specified configuration.
     #[must_use]
-    pub fn with_config(config: WebSocketConfig) -> Self {
+    pub const fn with_config(config: WebSocketConfig) -> Self {
         Self { config }
     }
 
@@ -149,9 +149,8 @@ impl AsyncRead for WebSocketTransportStream {
                 buf.put_slice(text.as_bytes());
                 Poll::Ready(Ok(()))
             }
-            Some(Ok(Message::Close(_))) => Poll::Ready(Ok(())),
+            Some(Ok(Message::Close(_))) | None => Poll::Ready(Ok(())),
             Some(Err(e)) => Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e))),
-            None => Poll::Ready(Ok(())),
             _ => Poll::Pending,
         }
     }
@@ -226,7 +225,7 @@ impl TransportListener for WebSocketTransportListener {
 
     /// Closes the listener.
     ///
-    /// For WebSockets, as server-side listening is not implemented, this is a
+    /// For `WebSockets`, as server-side listening is not implemented, this is a
     /// no-op.
     async fn close(&mut self) -> TransportResult<()> {
         Ok(())
@@ -283,7 +282,7 @@ impl Transport for WebSocketTransport {
     }
 
     /// Returns the transport type name ("websocket").
-    fn transport_type(&self) -> &str {
+    fn transport_type(&self) -> &'static str {
         "websocket"
     }
 
@@ -383,27 +382,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_websocket_connection_info() {
-        println!("test_websocket_connection_info: Skipped due to mocking complexity.");
-        assert!(true);
-    }
-
-    #[tokio::test]
-    async fn test_websocket_message_exchange() {
-        println!(
-            "test_websocket_message_exchange: Skipped due to mocking complexity and safety \
-             concerns."
-        );
-        assert!(true);
-    }
-
-    #[tokio::test]
-    async fn test_websocket_close() {
-        println!("test_websocket_close: Skipped due to mock complexity.");
-        assert!(true);
-    }
-
-    #[tokio::test]
     async fn test_websocket_concurrent_connections() {
         let transport = Arc::new(WebSocketTransport::new());
         let mut handles = vec![];
@@ -447,6 +425,7 @@ mod tests {
         // running. For now, we accept any number of successful connections
         // (including 0 if server not up).
         assert!(*count >= 0);
+        drop(count); // for clippy
     }
 
     #[tokio::test]
@@ -519,22 +498,16 @@ mod tests {
                 stream.close().await.expect("Failed to close stream");
             }
             Err(TransportError::ConnectionFailure(e)) => {
-                println!("Connection failed to wss://echo.websocket.org: {}", e);
+                println!("Connection failed to wss://echo.websocket.org: {e}");
             }
             Err(TransportError::InvalidUrl(e)) => {
                 // Should not happen with this URL
-                println!("Invalid URL for wss://echo.websocket.org: {}", e);
-                panic!("Invalid URL used in test: {}", e);
+                println!("Invalid URL for wss://echo.websocket.org: {e}");
+                panic!("Invalid URL used in test: {e}");
             }
             Err(e) => {
-                panic!(
-                    "Unexpected error type connecting to wss://echo.websocket.org: {:?}",
-                    e
-                );
+                panic!("Unexpected error type connecting to wss://echo.websocket.org: {e:?}");
             }
         }
-        // No strict assert on connection success here due to external dependency.
-        // The main point is to exercise the WSS path and ensure no panics.
-        assert!(true);
     }
 }

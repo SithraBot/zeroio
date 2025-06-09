@@ -1,14 +1,14 @@
-//! # FlexiMQ Protocol v1.0.0
+//! # `FlexiMQ` Protocol v1.0.0
 //!
-//! A high-performance, zero-copy implementation of the FlexiMQ protocol using
+//! A high-performance, zero-copy implementation of the `FlexiMQ` protocol using
 //! bytes and nom.
 //!
 //! ## Features
 //! - Zero-copy parsing with lazy deserialization
 //! - Async-friendly API with tokio integration
-//! - Memory-efficient with bytes::Bytes
+//! - Memory-efficient with `bytes::Bytes`
 //! - Type-safe message construction
-//! - MessagePack serialization for headers and payloads
+//! - `MessagePack` serialization for headers and payloads
 #![allow(clippy::cast_possible_truncation)]
 
 pub mod builder;
@@ -40,7 +40,7 @@ pub mod constants {
     /// Reserved field size
     pub const RESERVED_SIZE: usize = 16;
 
-    /// Special ClientID values
+    /// Special `ClientID` values
     pub const CLIENT_ID_UNASSIGNED: u32 = 0;
     pub const CLIENT_ID_BROKER: u32 = 1;
     pub const CLIENT_ID_MIN_DYNAMIC: u32 = 1000;

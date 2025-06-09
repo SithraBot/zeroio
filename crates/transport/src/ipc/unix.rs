@@ -9,18 +9,18 @@ use crate::error::{TransportError, TransportResult};
 /// Platform-specific stream type for Unix
 pub type PlatformStream = UnixStream;
 
-/// Platform-specific listener type for Unix  
+/// Platform-specific listener type for Unix
 pub struct PlatformListener {
     listener: UnixListener,
 }
 
 impl PlatformListener {
-    pub async fn accept(&mut self) -> TransportResult<PlatformStream> {
+    pub async fn accept(&self) -> TransportResult<PlatformStream> {
         let (stream, _) = self.listener.accept().await?;
         Ok(stream)
     }
 
-    pub async fn close(&mut self, path: &Path) -> TransportResult<()> {
+    pub fn close(path: &Path) {
         // UnixListener doesn't have a close method, cleanup happens on drop
         // We attempt to remove the socket file as a best effort.
         if path.exists() {
@@ -32,7 +32,6 @@ impl PlatformListener {
                 );
             }
         }
-        Ok(())
     }
 }
 
@@ -44,7 +43,7 @@ pub async fn connect(path: &Path) -> TransportResult<PlatformStream> {
 }
 
 /// Create a Unix domain socket listener
-pub async fn listen(path: &Path) -> TransportResult<PlatformListener> {
+pub fn listen(path: &Path) -> TransportResult<PlatformListener> {
     // Remove existing socket file if it exists
     if path.exists() {
         std::fs::remove_file(path).ok();
