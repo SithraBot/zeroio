@@ -15,7 +15,7 @@ use crate::error::Error;
 
 pub trait FromMessage<'a>: Sized {
     type Error: Into<Error>;
-    type Future: Future<Output = Result<Self, Self::Error>>;
+    type Future: Future<Output = Result<Self, Self::Error>> + Send + 'a;
 
     /// Create a new instance from a message asynchronously.
     fn from_message(message: &'a Message) -> Self::Future;
@@ -62,6 +62,7 @@ impl<'a, T, E> FromMessage<'a> for Result<T, E>
 where
     T: FromMessage<'a>,
     T::Error: Into<E>,
+    E: Send + 'a,
 {
     type Error = Infallible;
     type Future = FromMessageResultFuture<T::Future, E>;
@@ -177,84 +178,84 @@ mod tuple {
     }
 
     macro_rules! from_message_for_tuple {
-    (@impl) => {
-        impl FromMessage<'_> for () {
-            type Error = Infallible;
-            type Future = future::Ready<Result<Self, Self::Error>>;
+        (@impl) => {
+            impl FromMessage<'_> for () {
+                type Error = Infallible;
+                type Future = future::Ready<Result<Self, Self::Error>>;
 
-            fn from_message(_: &Message) -> Self::Future {
-                future::ok(())
-            }
-        }
-    };
-    (@impl $first_fut:ident, $first_t:ident; $($rest_fut:ident, $rest_t:ident;)*)=>{
-        from_message_for_tuple!(@inner $first_fut; $first_t $(, $rest_t)*);
-        from_message_for_tuple!(@impl $($rest_fut, $rest_t;)*);
-    };
-    (@inner $fut:ident; $($T:ident),*)=>{
-        #[allow(unused_parens)]
-        impl<'a, $($T),+> FromMessage<'a> for ($($T,)+)
-        where
-            $($T: FromMessage<'a>),+
-        {
-            type Error = Error;
-            type Future = $fut<'a, $($T),+>;
-
-            fn from_message(message: &'a Message) -> Self::Future {
-                $fut {
-                    $(
-                        $T: ExtractFuture::<$T::Future, $T>::Future {
-                            fut: $T::from_message(message),
-                        },
-                    )+
+                fn from_message(_: &Message) -> Self::Future {
+                    future::ok(())
                 }
             }
-        }
-        #[pin_project]
-        pub struct $fut<'a, $($T: FromMessage<'a>),+> {
-            $(
-                #[pin]
-                $T: ExtractFuture<$T::Future, $T>,
-            )+
-        }
-        impl<'a, $($T: FromMessage<'a>),+> Future for $fut<'a, $($T),+>
-        {
-            type Output = Result<($($T,)+), Error>;
+        };
+        (@impl $first_fut:ident, $first_t:ident; $($rest_fut:ident, $rest_t:ident;)*)=>{
+            from_message_for_tuple!(@inner $first_fut; $first_t $(, $rest_t)*);
+            from_message_for_tuple!(@impl $($rest_fut, $rest_t;)*);
+        };
+        (@inner $fut:ident; $($T:ident),*)=>{
+            #[allow(unused_parens)]
+            impl<'a, $($T),+> FromMessage<'a> for ($($T,)+)
+            where
+                $($T: FromMessage<'a> + Send + 'a),+
+            {
+                type Error = Error;
+                type Future = $fut<'a, $($T),+>;
 
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let mut this = self.project();
-
-                let mut ready = true;
-                $(
-                    match this.$T.as_mut().project() {
-                        ExtractProject::Future { fut } => match fut.poll(cx) {
-                            Poll::Ready(Ok(output)) => {
-                                let _ = this.$T.as_mut().project_replace(ExtractFuture::Done { output });
+                fn from_message(message: &'a Message) -> Self::Future {
+                    $fut {
+                        $(
+                            $T: ExtractFuture::<$T::Future, $T>::Future {
+                                fut: $T::from_message(message),
                             },
-                            Poll::Ready(Err(err)) => return Poll::Ready(Err(err.into())),
-                            Poll::Pending => ready = false,
-                        },
-                        ExtractProject::Done { .. } => {},
-                        ExtractProject::Empty => unreachable!("FromMessage polled after finished"),
+                        )+
                     }
-                )+
-
-                if ready {
-                    Poll::Ready(Ok(
-                        ($(
-                            match this.$T.project_replace(ExtractFuture::Empty) {
-                                ExtractReplaceProject::Done { output } => output,
-                                _ => unreachable!("FromMessage polled after finished"),
-                            },
-                        )+)
-                    ))
-                } else {
-                    Poll::Pending
                 }
             }
-        }
+            #[pin_project]
+            pub struct $fut<'a, $($T: FromMessage<'a>),+> {
+                $(
+                    #[pin]
+                    $T: ExtractFuture<$T::Future, $T>,
+                )+
+            }
+            impl<'a, $($T: FromMessage<'a>),+> Future for $fut<'a, $($T),+>
+            {
+                type Output = Result<($($T,)+), Error>;
+
+                fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                    let mut this = self.project();
+
+                    let mut ready = true;
+                    $(
+                        match this.$T.as_mut().project() {
+                            ExtractProject::Future { fut } => match fut.poll(cx) {
+                                Poll::Ready(Ok(output)) => {
+                                    let _ = this.$T.as_mut().project_replace(ExtractFuture::Done { output });
+                                },
+                                Poll::Ready(Err(err)) => return Poll::Ready(Err(err.into())),
+                                Poll::Pending => ready = false,
+                            },
+                            ExtractProject::Done { .. } => {},
+                            ExtractProject::Empty => unreachable!("FromMessage polled after finished"),
+                        }
+                    )+
+
+                    if ready {
+                        Poll::Ready(Ok(
+                            ($(
+                                match this.$T.project_replace(ExtractFuture::Empty) {
+                                    ExtractReplaceProject::Done { output } => output,
+                                    _ => unreachable!("FromMessage polled after finished"),
+                                },
+                            )+)
+                        ))
+                    } else {
+                        Poll::Pending
+                    }
+                }
+            }
+        };
     }
-}
 
     from_message_for_tuple!(@impl
         FutureTuple26, A;

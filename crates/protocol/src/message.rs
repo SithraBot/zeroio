@@ -27,10 +27,10 @@ pub struct Message {
     raw_data: Bytes,
 
     /// Cached parsed header (lazy)
-    header_cache: OnceCell<Header>,
+    header_cache: OnceCell<Arc<Header>>,
 
     /// Cached parsed payload (lazy)
-    payload_cache: OnceCell<rmpv::Value>,
+    payload_cache: OnceCell<Arc<rmpv::Value>>,
 
     /// Cached typed payload (lazy)
     typed_payload_cache: OnceCell<Arc<dyn std::any::Any + Send + Sync>>,
@@ -115,14 +115,14 @@ impl Message {
     /// Returns an error if header deserialization fails.
     pub fn header(&self) -> ProtocolResult<&Header> {
         // Parse header if not cached
-        fn init(this: &Message) -> ProtocolResult<Header> {
+        fn init(this: &Message) -> ProtocolResult<Arc<Header>> {
             if this.base_header.header_length > 0 {
-                Ok(rmp_serde::from_slice(&this.raw_header_bytes())?)
+                Ok(Arc::new(rmp_serde::from_slice(&this.raw_header_bytes())?))
             } else {
-                Ok(Header::default())
+                Ok(Arc::new(Header::default()))
             }
         }
-        self.header_cache.get_or_try_init(|| init(self))
+        self.header_cache.get_or_try_init(|| init(self)).map(AsRef::as_ref)
     }
 
     /// Parse and cache the payload if not already cached
@@ -135,14 +135,14 @@ impl Message {
     /// Returns an error if payload deserialization fails.
     pub fn payload(&self) -> ProtocolResult<&rmpv::Value> {
         // Parse payload if not cached
-        fn init(this: &Message) -> ProtocolResult<rmpv::Value> {
+        fn init(this: &Message) -> ProtocolResult<Arc<rmpv::Value>> {
             if this.base_header.payload_length > 0 {
-                Ok(rmp_serde::from_slice(&this.raw_payload_bytes())?)
+                Ok(Arc::new(rmp_serde::from_slice(&this.raw_payload_bytes())?))
             } else {
-                Ok(rmpv::Value::Nil)
+                Ok(Arc::new(rmpv::Value::Nil))
             }
         }
-        self.payload_cache.get_or_try_init(|| init(self))
+        self.payload_cache.get_or_try_init(|| init(self)).map(AsRef::as_ref)
     }
 
     /// Deserialize payload to a specific type

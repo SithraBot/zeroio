@@ -4,7 +4,7 @@ use fleximq_protocol::Message;
 
 use crate::{error::Error, extract::FromMessage, handler::Handler};
 
-pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub type BoxedService<'a, Req, Rep, Err> =
     Box<dyn Fn(Req) -> BoxedFuture<'a, Result<Rep, Err>> + Send + 'a>;
@@ -20,13 +20,14 @@ pub type BoxedFleximqService<'a> = BoxedService<'a, &'a Message, Message, Error>
 
 pub fn handler_service<'a, H, Args>(handler: H) -> BoxedFleximqService<'a>
 where
-    H: Handler<Args> + Clone + Send + Sync,
-    Args: FromMessage<'a>,
-    H::Response: Into<Message>,
+    H: Handler<Args> + Clone + Send,
+    Args: FromMessage<'a> + Send,
+    H::Response: Into<Message> + Send,
+    H::Future: Send,
 {
     boxed_service(move |message| {
         let handler = handler.clone();
-        let fut = async move {
+        let fut = Box::new(async move {
             // Process the arguments from the message first
             let args = match Args::from_message(message).await {
                 Ok(args) => args,
@@ -34,7 +35,10 @@ where
             };
             let response = handler.handle(args).await;
             Ok(response.into())
-        };
-        Box::pin(fut)
+        });
+        Box::into_pin(fut)
     })
 }
+
+#[cfg(test)]
+mod test {}
