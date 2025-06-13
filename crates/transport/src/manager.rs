@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use lru::LruCache;
 
 use crate::{
-    IpcTransport, StdioTransport, TcpTransport, WebSocketTransport,
+    ChannelTransport, IpcTransport, StdioTransport, TcpTransport, WebSocketTransport,
     error::{TransportError, TransportResult},
     traits::{Transport, TransportStream},
 };
@@ -122,6 +122,11 @@ impl TransportManager {
         // WebSocket transport
         self.register_transport(Arc::new(TypeErasedTransport {
             inner: WebSocketTransport::new(),
+        }));
+
+        // In-process channel transport (for tests)
+        self.register_transport(Arc::new(TypeErasedTransport {
+            inner: ChannelTransport::new(),
         }));
     }
 

@@ -1,5 +1,2 @@
-pub mod boxed;
-pub mod error;
-pub mod extract;
-pub mod handler;
-pub mod peer;
+//! fleximq Peer – ergonomic high-level API built on top of protocol &
+//! transport.

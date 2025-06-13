@@ -299,10 +299,10 @@ pub fn validate_message_structure(
     };
 
     // Define required and forbidden fields for each message type
-    let (required, forbidden) = match message_type {
+    let (required, forbidden): (&[HeaderField], &[HeaderField]) = match message_type {
         Join => (
-            vec![HeaderField::ClientName],
-            vec![
+            &[HeaderField::ClientName],
+            &[
                 HeaderField::Routing,
                 HeaderField::Reqrep,
                 HeaderField::Topic,
@@ -311,12 +311,12 @@ pub fn validate_message_structure(
             ],
         ),
         Request | Response => (
-            vec![HeaderField::Routing, HeaderField::Reqrep],
-            vec![HeaderField::Topic, HeaderField::Auth, HeaderField::Keepalive],
+            &[HeaderField::Routing, HeaderField::Reqrep],
+            &[HeaderField::Topic, HeaderField::Auth, HeaderField::Keepalive],
         ),
         Notification => (
-            vec![HeaderField::Routing],
-            vec![
+            &[HeaderField::Routing],
+            &[
                 HeaderField::Reqrep,
                 HeaderField::Topic,
                 HeaderField::Auth,
@@ -324,8 +324,8 @@ pub fn validate_message_structure(
             ],
         ),
         Broadcast => (
-            vec![],
-            vec![
+            &[],
+            &[
                 HeaderField::Routing,
                 HeaderField::Reqrep,
                 HeaderField::Topic,
@@ -334,12 +334,17 @@ pub fn validate_message_structure(
             ],
         ),
         Publish => (
-            vec![HeaderField::Topic],
-            vec![HeaderField::Reqrep, HeaderField::Auth, HeaderField::Keepalive],
+            &[HeaderField::Topic],
+            &[
+                HeaderField::Routing,
+                HeaderField::Reqrep,
+                HeaderField::Auth,
+                HeaderField::Keepalive,
+            ],
         ),
         Subscribe | Unsubscribe => (
-            vec![HeaderField::Topic],
-            vec![
+            &[HeaderField::Topic],
+            &[
                 HeaderField::Routing,
                 HeaderField::Reqrep,
                 HeaderField::Status,
@@ -348,8 +353,8 @@ pub fn validate_message_structure(
             ],
         ),
         Ping | Pong => (
-            vec![HeaderField::Keepalive],
-            vec![
+            &[HeaderField::Keepalive],
+            &[
                 HeaderField::Routing,
                 HeaderField::Reqrep,
                 HeaderField::Topic,

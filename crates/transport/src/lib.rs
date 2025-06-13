@@ -6,8 +6,10 @@
 //!   Windows)
 //! - WebSocket: WebSocket protocol over TCP
 //! - STDIO: Standard input/output for subprocess communication
+//! - Channel: In-process channel communication
 #![allow(clippy::cast_possible_truncation)]
 
+pub mod channel;
 pub mod error;
 pub mod ipc;
 pub mod manager;
@@ -18,6 +20,7 @@ pub mod traits;
 pub mod websocket;
 
 // Re-export main types
+pub use channel::ChannelTransport;
 pub use error::{TransportError, TransportResult};
 pub use ipc::{IpcConfig, IpcTransport};
 pub use manager::{CacheStats, TransportManager};

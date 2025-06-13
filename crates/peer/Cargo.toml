@@ -19,6 +19,8 @@ url.workspace = true
 pin-project = "1"
 crossbeam-queue = "0.3"
 futures-util.workspace = true
+tower.workspace = true
+dashmap.workspace = true
 
 [lints]
 workspace = true
