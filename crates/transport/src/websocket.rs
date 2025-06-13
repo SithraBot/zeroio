@@ -8,9 +8,14 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures_util::{Sink, Stream};
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
+use futures_util::{Sink, Stream, stream::FusedStream};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    net::{TcpListener, TcpStream},
+};
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream, accept_async, connect_async, tungstenite::Message,
+};
 use url::Url;
 
 use crate::{
@@ -85,13 +90,13 @@ impl WebSocketTransport {
 
 /// A stream representing an active WebSocket connection.
 pub struct WebSocketTransportStream {
-    stream:   WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
+    stream:   WebSocketStream<MaybeTlsStream<TcpStream>>,
     info:     ConnectionInfo,
     timeouts: ConnectionTimeouts,
 }
 
 impl WebSocketTransportStream {
-    fn new(stream: WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>, url: &Url) -> Self {
+    fn new(stream: WebSocketStream<MaybeTlsStream<TcpStream>>, url: &Url) -> Self {
         let info = ConnectionInfo {
             transport_type: "websocket".to_string(),
             local_addr:     Some(url.to_string()),
@@ -122,9 +127,10 @@ impl TransportStream for WebSocketTransportStream {
     /// This typically means the underlying stream has not been explicitly
     /// closed.
     fn is_connected(&self) -> bool {
-        true // For WebSocket, assume connected if stream object exists and not explicitly closed.
-        // Actual state might depend on server sending a close frame or network
-        // issues.
+        !self.stream.is_terminated()
+        // For WebSocket, assume connected if stream object exists and not
+        // explicitly closed. Actual state might depend on server
+        // sending a close frame or network issues.
     }
 
     /// Gracefully closes the WebSocket connection.
@@ -191,28 +197,44 @@ impl AsyncWrite for WebSocketTransportStream {
 }
 
 /// A listener for incoming WebSocket connections.
-///
-/// Note: The current implementation does not support acting as a WebSocket
-/// server. Calling `accept` will result in a `TransportError::NotSupported`.
 pub struct WebSocketTransportListener {
-    url:     Url,
-    _config: WebSocketConfig, // Prefixed with _ as it's unused for the client-only listener logic
+    /// Underlying TCP listener bound to the requested host/port
+    listener: TcpListener,
+    /// Original URL that the listener was created for (used for connection
+    /// info)
+    url:      Url,
+    _config:  WebSocketConfig, // keep for future configuration (TLS etc.)
 }
 
 #[async_trait]
 impl TransportListener for WebSocketTransportListener {
     type Stream = WebSocketTransportStream;
 
-    /// Attempts to accept a new WebSocket connection.
+    /// Accept a new incoming WebSocket connection.
     ///
-    /// Currently, this method is not supported for WebSocket listeners and will
-    /// return `TransportError::NotSupported`.
+    /// This method awaits an incoming TCP connection, performs the WebSocket
+    /// handshake using `tokio_tungstenite::accept_async`, and returns the
+    /// resulting `WebSocketTransportStream` on success.
     async fn accept(&mut self) -> TransportResult<Self::Stream> {
-        Err(TransportError::UnsupportedTransport(
-            "WebSocket server functionality is not implemented in this listener. Use connect for \
-             client-side connections."
-                .to_string(),
-        ))
+        // Accept raw TCP connection first
+        let (tcp_stream, _remote_addr) = self
+            .listener
+            .accept()
+            .await
+            .map_err(|e| TransportError::Io(format!("Failed to accept TCP connection: {e}")))?;
+
+        // Wrap into MaybeTlsStream to satisfy type consistency with client side
+        let maybe_stream = MaybeTlsStream::Plain(tcp_stream);
+
+        // Perform the WebSocket server handshake
+        let ws_stream = accept_async(maybe_stream).await.map_err(|e| {
+            TransportError::ConnectionFailure(format!(
+                "Failed to complete WebSocket handshake for listener {}: {e}",
+                self.url
+            ))
+        })?;
+
+        Ok(WebSocketTransportStream::new(ws_stream, &self.url))
     }
 
     /// Gets the local address this listener would be bound to.
@@ -220,7 +242,10 @@ impl TransportListener for WebSocketTransportListener {
     /// Since server-side listening is not supported, this returns the URL
     /// that was intended for listening.
     fn local_addr(&self) -> TransportResult<String> {
-        Ok(self.url.to_string())
+        self.listener
+            .local_addr()
+            .map(|addr| addr.to_string())
+            .map_err(|e| TransportError::Io(format!("Failed to get local address: {e}")))
     }
 
     /// Closes the listener.
@@ -275,8 +300,28 @@ impl Transport for WebSocketTransport {
     ) -> TransportResult<Box<dyn TransportListener<Stream = Self::Stream>>> {
         let parsed_url = Self::parse_url(url)?;
 
+        // Only plain WS is supported for server side at the moment
+        if parsed_url.scheme() == "wss" {
+            return Err(TransportError::UnsupportedTransport(
+                "wss:// listener is not supported yet".to_string(),
+            ));
+        }
+
+        let host = parsed_url
+            .host_str()
+            .ok_or_else(|| TransportError::InvalidUrl("Missing host".to_string()))?;
+        let port = parsed_url
+            .port()
+            .ok_or_else(|| TransportError::InvalidUrl("Missing port".to_string()))?;
+        let addr = format!("{host}:{port}");
+
+        let listener = TcpListener::bind(&addr)
+            .await
+            .map_err(|e| TransportError::Io(format!("Failed to bind to {addr}: {e}")))?;
+
         Ok(Box::new(WebSocketTransportListener {
-            url:     parsed_url,
+            listener,
+            url: parsed_url,
             _config: self.config.clone(),
         }))
     }
