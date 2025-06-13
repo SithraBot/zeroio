@@ -11,10 +11,10 @@ use fleximq_transport::{
 
 #[tokio::main]
 async fn main() -> TransportResult<()> {
-    let mut listener = IpcTransport::new().listen("ipc://hello_world").await.unwrap();
+    let mut listener = IpcTransport::new().listen("ipc://hello_world").await?;
     let mut handles = vec![];
     loop {
-        let mut stream = listener.accept().await.unwrap();
+        let mut stream = listener.accept().await?;
         if stream.is_connected() {
             println!("Client connected, info: {:?}", stream.connection_info());
         }

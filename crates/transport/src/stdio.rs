@@ -10,8 +10,8 @@ use std::{
 
 use async_trait::async_trait;
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
-    process::{Child, ChildStdin, ChildStdout, Command},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf, stdin, stdout},
+    process::{Child, Command},
 };
 
 use crate::{
@@ -78,16 +78,16 @@ impl StdioTransport {
 /// A stream representing communication with a subprocess via its standard input
 /// and output.
 pub struct StdioTransportStream {
-    stdin:    ChildStdin,
-    stdout:   ChildStdout,
-    child:    Child,
+    write:    Pin<Box<dyn AsyncWrite + Send + Sync>>,
+    read:     Pin<Box<dyn AsyncRead + Send + Sync>>,
+    child:    Option<Child>,
     info:     ConnectionInfo,
     timeouts: ConnectionTimeouts,
 }
 
 impl StdioTransportStream {
     /// Constructs a new `StdioTransportStream` from a spawned child process.
-    fn new(mut child: Child, command: &str) -> TransportResult<Self> {
+    fn new_from_child(mut child: Child, command: &str) -> TransportResult<Self> {
         let stdin = child
             .stdin
             .take()
@@ -114,17 +114,50 @@ impl StdioTransportStream {
         };
 
         Ok(Self {
-            stdin,
-            stdout,
-            child,
+            write: Box::pin(stdin),
+            read: Box::pin(stdout),
+            child: Some(child),
             info,
             timeouts,
         })
     }
 
+    /// Constructs a new `StdioTransportStream` from self.
+    fn new_from_self() -> Self {
+        let stdin = stdin();
+        let stdout = stdout();
+
+        let info = ConnectionInfo {
+            transport_type: "stdio".to_string(),
+            local_addr:     Some("stdio://stdin".into()),
+            remote_addr:    Some("stdio://stdout".into()),
+            metadata:       std::collections::HashMap::new(),
+            established_at: std::time::Instant::now(),
+        };
+
+        // Use default timeouts for stdio transport
+        let timeouts = ConnectionTimeouts {
+            connect_timeout: Some(Duration::from_secs(30)), // Default connect timeout
+            read_timeout:    Some(Duration::from_secs(30)), // Default read timeout
+            write_timeout:   Some(Duration::from_secs(30)), // Default write timeout
+        };
+
+        Self {
+            write: Box::pin(stdout),
+            read: Box::pin(stdin),
+            child: None,
+            info,
+            timeouts,
+        }
+    }
+
     /// Checks if the underlying child process is still running.
     pub fn is_running(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
+        if let Some(child) = &mut self.child {
+            matches!(child.try_wait(), Ok(None))
+        } else {
+            true
+        }
     }
 }
 
@@ -161,17 +194,23 @@ impl TransportStream for StdioTransportStream {
     /// waiting for the child, or killing it.
     async fn close(&mut self) -> TransportResult<()> {
         // Close stdin to signal end of input to the child process.
-        self.stdin.shutdown().await?;
+        self.write.shutdown().await?;
 
         // Wait for child to exit gracefully, with a timeout.
-        match tokio::time::timeout(std::time::Duration::from_secs(5), self.child.wait()).await {
-            Ok(Ok(_exit_status)) => Ok(()), // Process exited gracefully.
-            Ok(Err(e)) => Err(TransportError::Io(e.to_string())), // Error waiting for process.
-            Err(_) => {
-                // Timeout reached, forcefully kill the process.
-                self.child.kill().await?;
-                Ok(())
+        if let Some(mut child) = self.child.take() {
+            match tokio::time::timeout(std::time::Duration::from_secs(5), child.wait()).await {
+                Ok(Ok(_exit_status)) => Ok(()), // Process exited gracefully.
+                Ok(Err(e)) => Err(TransportError::Io(e.to_string())), // Error waiting for process.
+                Err(_) => {
+                    // Timeout reached, forcefully kill the process.
+
+                    child.kill().await?;
+
+                    Ok(())
+                }
             }
+        } else {
+            Ok(())
         }
     }
 }
@@ -182,7 +221,7 @@ impl AsyncRead for StdioTransportStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.stdout).poll_read(cx, buf)
+        Pin::new(&mut self.read).poll_read(cx, buf)
     }
 }
 
@@ -192,15 +231,15 @@ impl AsyncWrite for StdioTransportStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.stdin).poll_write(cx, buf)
+        Pin::new(&mut self.write).poll_write(cx, buf)
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.stdin).poll_flush(cx)
+        Pin::new(&mut self.write).poll_flush(cx)
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.stdin).poll_shutdown(cx)
+        Pin::new(&mut self.write).poll_shutdown(cx)
     }
 }
 
@@ -275,10 +314,7 @@ impl Transport for StdioTransport {
         let (command_to_run, args_to_use) = if url == "stdio://" {
             // Use command from StdioConfig if url is just "stdio://"
             if self.config.command.is_empty() {
-                return Err(TransportError::InvalidUrl(
-                    "STDIO URL is \"stdio://\" but no command is configured in StdioTransport."
-                        .to_string(),
-                ));
+                return Ok(StdioTransportStream::new_from_self());
             }
             (self.config.command.clone(), self.config.args.clone())
         } else if let Some(cmd_part) = url.strip_prefix("stdio://") {
@@ -326,7 +362,7 @@ impl Transport for StdioTransport {
             ))
         })?;
 
-        StdioTransportStream::new(child, &command_to_run)
+        StdioTransportStream::new_from_child(child, &command_to_run)
     }
 
     /// Attempts to listen for incoming connections.
