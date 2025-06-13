@@ -9,7 +9,7 @@ use bytes::BytesMut;
 use fleximq_protocol::{
     codec::{MessageDecoder, MessageEncoder},
     errors::ProtocolError,
-    message::Message,
+    message::{Message, RawMessage},
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Encoder};
@@ -161,7 +161,7 @@ pub trait MessageStreamExt: TransportStream {
     async fn read_message(&mut self) -> TransportResult<Message>;
 
     /// Write a protocol message to the stream
-    async fn write_message(&mut self, message: &Message) -> TransportResult<()>;
+    async fn write_message(&mut self, message: &RawMessage) -> TransportResult<()>;
 }
 
 // Implement for all transport streams
@@ -195,16 +195,17 @@ impl<T: TransportStream> MessageStreamExt for T {
         }
     }
 
-    async fn write_message(&mut self, message: &Message) -> TransportResult<()> {
+    async fn write_message(&mut self, message: &RawMessage) -> TransportResult<()> {
         // Use direct encoding instead of the adapter
-        let mut encoder = MessageEncoder::new();
-        let mut buffer = BytesMut::new();
+        // let mut encoder = MessageEncoder::new();
+        // let mut buffer = BytesMut::new();
 
         // Encode the message
-        encoder.encode(message.clone(), &mut buffer).map_err(TransportError::Protocol)?;
+        // encoder.encode(message.clone(), &mut
+        // buffer).map_err(TransportError::Protocol)?;
 
         // Write the buffer to the stream
-        self.write_all(&buffer)
+        self.write_all(&message.to_bytes()?)
             .await
             .map_err(|e| TransportError::Io(format!("Error writing message: {e}")))?;
 
@@ -407,11 +408,9 @@ mod tests {
 
         // Create a test message
         let raw_message = MessageBuilder::simple_publish(1000, "test.topic").build().unwrap();
-        // Convert to Message using into_message
-        let message = raw_message.into_message().unwrap();
 
         // Write the message using the extension method
-        client.write_message(&message).await.unwrap();
+        client.write_message(&raw_message).await.unwrap();
 
         // Read the message from the server
         let mut buffer = BytesMut::with_capacity(1024);
