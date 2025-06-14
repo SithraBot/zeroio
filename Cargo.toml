@@ -36,6 +36,8 @@ futures-util = { version = "0.3", default-features = false, features = [
     "sink",
     "std",
 ] }
+triomphe = { version = "0.1", features = ["unsize"] }
+unsize = "1"
 
 [workspace.lints.clippy]
 # Performance lints - important for a communication library

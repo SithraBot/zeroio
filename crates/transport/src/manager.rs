@@ -2,13 +2,14 @@
 //! caching
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
 use dashmap::DashMap;
 use lru::LruCache;
+use triomphe::Arc;
 
 use crate::{
     ChannelTransport, IpcTransport, StdioTransport, TcpTransport, WebSocketTransport,
@@ -102,32 +103,43 @@ impl TransportManager {
         manager
     }
 
+    fn new_transport<T>(
+        transport: T,
+    ) -> Arc<dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync>
+    where
+        T: Transport + 'static,
+    {
+        use unsize::{CoerceUnsize, Coercion};
+        let coercion = unsafe {
+            fn _f<T>(
+                x: *const TypeErasedTransport<T>,
+            ) -> *const (dyn Transport<Stream = Box<dyn TransportStream>> + Send + Sync)
+            where
+                T: Transport + 'static,
+            {
+                x
+            }
+            Coercion::new(_f)
+        };
+        Arc::new(TypeErasedTransport { inner: transport }).unsize(coercion)
+    }
+
     /// Register instances of the default built-in transports
     fn register_default_transports(&self) {
         // TCP transport
-        self.register_transport(Arc::new(TypeErasedTransport {
-            inner: TcpTransport::new(),
-        }));
+        self.register_transport(Self::new_transport(TcpTransport::new()));
 
         // IPC transport
-        self.register_transport(Arc::new(TypeErasedTransport {
-            inner: IpcTransport::new(),
-        }));
+        self.register_transport(Self::new_transport(IpcTransport::new()));
 
         // STDIO transport
-        self.register_transport(Arc::new(TypeErasedTransport {
-            inner: StdioTransport::new(),
-        }));
+        self.register_transport(Self::new_transport(StdioTransport::new()));
 
         // WebSocket transport
-        self.register_transport(Arc::new(TypeErasedTransport {
-            inner: WebSocketTransport::new(),
-        }));
+        self.register_transport(Self::new_transport(WebSocketTransport::new()));
 
         // In-process channel transport (for tests)
-        self.register_transport(Arc::new(TypeErasedTransport {
-            inner: ChannelTransport::new(),
-        }));
+        self.register_transport(Self::new_transport(ChannelTransport::new()));
     }
 
     /// Register a custom transport implementation

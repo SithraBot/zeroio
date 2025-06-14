@@ -5,12 +5,13 @@
 //! mechanisms (TCP, IPC, WebSocket, STDIO) with a focus on performance, memory
 //! efficiency, and proper async handling.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use fleximq_protocol::message::Message;
 use tokio::io::{AsyncRead, AsyncWrite};
+use triomphe::Arc;
 
 use crate::error::TransportResult;
 

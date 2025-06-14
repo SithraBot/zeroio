@@ -20,6 +20,8 @@ nom.workspace = true
 futures-util.workspace = true
 once_cell.workspace = true
 dashmap.workspace = true
+triomphe.workspace = true
+unsize.workspace = true
 
 # Zero-copy optimizations
 memchr = "2.7"

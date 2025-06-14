@@ -1,9 +1,9 @@
 //! Message structures with lazy parsing support
-use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use once_cell::sync::OnceCell;
 use serde::{Serialize, de::DeserializeOwned};
+use triomphe::Arc;
 
 pub const NIL: rmpv::Value = rmpv::Value::Nil;
 
@@ -160,13 +160,23 @@ impl Message {
     where
         T: serde::de::DeserializeOwned + Send + Sync + 'static,
     {
+        use unsize::{CoerceUnsize, Coercion};
         if let Some(payload) = self.typed_payload_cache.get() {
             if let Some(payload) = payload.downcast_ref::<T>() {
                 return Ok(payload);
             }
         }
         let payload = rmp_serde::from_slice::<T>(&self.raw_payload_bytes())?;
-        let _ = self.typed_payload_cache.set(Arc::new(payload));
+        let coercion = unsafe {
+            fn _f<T>(x: *const T) -> *const (dyn std::any::Any + Send + Sync)
+            where
+                T: std::any::Any + Send + Sync,
+            {
+                x
+            }
+            Coercion::new(_f)
+        };
+        let _ = self.typed_payload_cache.set(Arc::new(payload).unsize(coercion));
         #[allow(clippy::expect_used)]
         let payload = self
             .typed_payload_cache
