@@ -1,16 +1,20 @@
 //! Windows-specific IPC implementation using named pipes
 
-use std::path::Path;
+use std::{fmt::Debug, path::Path, pin::Pin};
 
-use tokio::net::windows::named_pipe::{
-    ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions,
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::windows::named_pipe::{ClientOptions, NamedPipeServer, ServerOptions},
 };
 
 use super::IpcConfig;
 use crate::error::{TransportError, TransportResult};
 
 /// Platform-specific stream type for Windows
-pub type PlatformStream = NamedPipeClient;
+pub type PlatformStream = Pin<Box<dyn PlatformStreamTrait>>;
+
+pub trait PlatformStreamTrait: AsyncRead + AsyncWrite + Debug + Send + Sync {}
+impl<T> PlatformStreamTrait for T where T: AsyncRead + AsyncWrite + Debug + Send + Sync {}
 
 /// Platform-specific listener type for Windows
 pub struct PlatformListener {
@@ -21,11 +25,6 @@ pub struct PlatformListener {
 
 impl PlatformListener {
     pub async fn accept(&mut self) -> TransportResult<PlatformStream> {
-        // Wait for a client to connect to the current server instance
-        self.server.connect().await?;
-
-        // Create a new server instance for the next connection
-        #[allow(clippy::cast_possible_truncation)]
         let new_server = ServerOptions::new()
             .first_pipe_instance(false)
             .in_buffer_size(self.config.buffer_size as u32)
@@ -33,34 +32,28 @@ impl PlatformListener {
             .max_instances(1)
             .create(&self.pipe_name)
             .map_err(|e| {
-                TransportError::ConnectionFailure(format!(
-                    "Failed to create new pipe instance: {e}"
-                ))
+                TransportError::ConnectionFailure(format!("Error: {e} (path: {})", self.pipe_name))
             })?;
 
-        // Replace our server with the new one for future accepts
-        let _connected_server = std::mem::replace(&mut self.server, new_server);
+        let old_server = std::mem::replace(&mut self.server, new_server);
+        old_server.connect().await?;
 
-        // Create a client connection to communicate with the connected client
-        let client = ClientOptions::new().open(&self.pipe_name).map_err(|e| {
-            TransportError::ConnectionFailure(format!("Failed to create client stream: {e}"))
-        })?;
-
-        Ok(client)
+        Ok(Box::pin(old_server))
     }
 
-    pub async fn close(_path: &Path) -> TransportResult<()> {
+    pub const fn close(_path: &Path) {
         // Named pipe server closes when dropped
-        Ok(())
     }
 }
 
 /// Connect to a Windows named pipe
+#[allow(clippy::unused_async)]
 pub async fn connect(path: &Path, _config: &IpcConfig) -> TransportResult<PlatformStream> {
     let pipe_name = format_pipe_name(path);
-    ClientOptions::new().open(&pipe_name).map_err(|e| {
+    let client = ClientOptions::new().open(&pipe_name).map_err(|e| {
         TransportError::ConnectionFailure(format!("Failed to connect to {pipe_name}: {e}"))
-    })
+    })?;
+    Ok(Box::pin(client))
 }
 
 /// Create a Windows named pipe listener
@@ -72,7 +65,7 @@ pub fn listen(path: &Path, config: &IpcConfig) -> TransportResult<PlatformListen
         .first_pipe_instance(true)
         .in_buffer_size(config.buffer_size as u32)
         .out_buffer_size(config.buffer_size as u32)
-        .max_instances(1)
+        .max_instances(254)
         .create(&pipe_name)
         .map_err(|e| {
             TransportError::ConnectionFailure(format!(
