@@ -1,9 +1,6 @@
 //! Core protocol types and data structures
 
-use std::{
-    collections::HashMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,17 +13,27 @@ pub type ClientId = u32;
 /// Message types as defined in the protocol v1.0.0
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
+/// Defines the type of a fleximq message. This is part of the fixed header.
 pub enum MessageType {
+    /// Client request to join the network.
     Join         = 0,
+    /// A message sent from a client expecting a response from a peer.
     Request      = 1,
+    /// A message sent from a peer in response to a `Request` message.
     Response     = 2,
+    /// A one-way message sent from one peer to another, not expecting a
+    /// response.
     Notification = 3,
+    /// A message sent from a client to all other connected clients (or a subset
+    /// based on group/topic).
     Broadcast    = 4,
+    /// A message published to a specific topic, to be delivered to subscribed
+    /// clients.
     Publish      = 5,
+    /// Client request to subscribe to a specific topic.
     Subscribe    = 6,
+    /// Client request to unsubscribe from a specific topic.
     Unsubscribe  = 7,
-    Ping         = 8,
-    Pong         = 9,
 }
 
 impl MessageType {
@@ -42,8 +49,6 @@ impl MessageType {
             5 => Some(Self::Publish),
             6 => Some(Self::Subscribe),
             7 => Some(Self::Unsubscribe),
-            8 => Some(Self::Ping),
-            9 => Some(Self::Pong),
             _ => None,
         }
     }
@@ -66,8 +71,6 @@ impl MessageType {
             Self::Publish => "PUB",
             Self::Subscribe => "SUB",
             Self::Unsubscribe => "UNSUB",
-            Self::Ping => "PING",
-            Self::Pong => "PONG",
         }
     }
 }
@@ -77,33 +80,57 @@ impl MessageType {
 pub struct StatusCode(pub u16);
 
 impl StatusCode {
+    /// 202 Accepted
     pub const ACCEPTED: Self = Self(202);
+    /// 604 Authentication Failed
     pub const AUTHENTICATION_FAILED: Self = Self(604);
+    /// 502 Bad Gateway
     pub const BAD_GATEWAY: Self = Self(502);
     // Client error codes (400-499)
+    /// 400 Bad Request
     pub const BAD_REQUEST: Self = Self(400);
     // Protocol specific codes (600-699)
+    /// 600 Client Not Found
     pub const CLIENT_NOT_FOUND: Self = Self(600);
+    /// 409 Conflict
     pub const CONFLICT: Self = Self(409);
+    /// 201 Created
     pub const CREATED: Self = Self(201);
+    /// 403 Forbidden
     pub const FORBIDDEN: Self = Self(403);
+    /// 504 Gateway Timeout
     pub const GATEWAY_TIMEOUT: Self = Self(504);
     // Server error codes (500-599)
+    /// 500 Internal Server Error
     pub const INTERNAL_SERVER_ERROR: Self = Self(500);
+    /// 602 Invalid Routing
     pub const INVALID_ROUTING: Self = Self(602);
+    /// 605 Join Rejected
     pub const JOIN_REJECTED: Self = Self(605);
+    /// 405 Method Not Allowed
     pub const METHOD_NOT_ALLOWED: Self = Self(405);
+    /// 404 Not Found
     pub const NOT_FOUND: Self = Self(404);
+    /// 501 Not Implemented
     pub const NOT_IMPLEMENTED: Self = Self(501);
+    /// 204 No Content
     pub const NO_CONTENT: Self = Self(204);
     // Success codes (200-299)
+    /// 200 OK
     pub const OK: Self = Self(200);
+    /// 413 Payload Too Large
     pub const PAYLOAD_TOO_LARGE: Self = Self(413);
+    /// 408 Request Timeout
     pub const REQUEST_TIMEOUT: Self = Self(408);
+    /// 503 Service Unavailable
     pub const SERVICE_UNAVAILABLE: Self = Self(503);
+    /// 603 Subscription Failed
     pub const SUBSCRIPTION_FAILED: Self = Self(603);
+    /// 429 Too Many Requests
     pub const TOO_MANY_REQUESTS: Self = Self(429);
+    /// 601 Topic Not Found
     pub const TOPIC_NOT_FOUND: Self = Self(601);
+    /// 401 Unauthorized
     pub const UNAUTHORIZED: Self = Self(401);
 
     /// Check if this is a success status (200-299)
@@ -145,83 +172,81 @@ pub struct Routing {
 
 /// Request/Response correlation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Represents a request or response message, used in request-reply patterns.
+/// This structure is part of the message header and provides context for the
+/// request or response.
 pub struct RequestResponse {
     #[serde(rename = "type")]
+    /// The type of the request or response (e.g., Request, Response, Error).
     pub req_type: RequestResponseType,
+    /// A unique identifier for the request, used to correlate requests with
+    /// responses.
     pub id:       String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+/// Represents the type of request-response pattern.
 pub enum RequestResponseType {
+    /// Indicates a standard request.
     Request,
+    /// Indicates a correlation ID for request-response matching.
     Correlation,
-}
-
-/// Keep-alive information
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct KeepAlive {
-    pub timestamp: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interval:  Option<u32>,
-}
-
-impl KeepAlive {
-    /// Create a new keep-alive with current timestamp
-    #[must_use]
-    pub fn new() -> Self {
-        let timestamp =
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
-
-        Self {
-            timestamp,
-            interval: None,
-        }
-    }
-
-    /// Create a new keep-alive with current timestamp and interval
-    #[must_use]
-    pub fn with_interval(interval_seconds: u32) -> Self {
-        let mut ka = Self::new();
-        ka.interval = Some(interval_seconds);
-        ka
-    }
-}
-
-impl Default for KeepAlive {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 /// Authentication information
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Auth {
     #[serde(rename = "type")]
+    /// The type of authentication used.
     pub auth_type:   AuthType,
     #[serde(flatten)]
+    /// The credentials for authentication.
     pub credentials: AuthCredentials,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+/// The type of authentication used.
 pub enum AuthType {
+    /// Token-based authentication.
     Token,
+    /// Basic authentication (username and password).
     Basic,
+    /// API key authentication.
     #[serde(rename = "api_key")]
     ApiKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
+/// Authentication credentials.
 pub enum AuthCredentials {
-    Token { token: String },
-    Basic { username: String, password: String },
-    ApiKey { api_key: String },
+    /// Token-based authentication credentials.
+    Token {
+        /// Authentication token.
+        token: String,
+    },
+    /// Basic authentication credentials (username and password).
+    Basic {
+        /// Username for basic authentication.
+        username: String,
+        /// Password for basic authentication.
+        password: String,
+    },
+    /// API key authentication credentials.
+    ApiKey {
+        /// API key for authentication.
+        api_key: String,
+    },
 }
 
 impl Auth {
-    /// Create token authentication
+    /// Creates a new `Auth` instance with token authentication.
+    ///
+    /// # Arguments
+    ///
+    /// * `token`: The authentication token.
     pub fn token(token: impl Into<String>) -> Self {
         Self {
             auth_type:   AuthType::Token,
@@ -231,7 +256,7 @@ impl Auth {
         }
     }
 
-    /// Create basic authentication
+    /// Creates a new `Auth` instance with basic authentication.
     pub fn basic(username: impl Into<String>, password: impl Into<String>) -> Self {
         Self {
             auth_type:   AuthType::Basic,
@@ -256,23 +281,25 @@ impl Auth {
 /// Message header fields
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Header {
+    /// Routing information for the message header.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing: Option<Vec<Routing>>,
 
+    /// Request/response correlation information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reqrep: Option<RequestResponse>,
 
+    /// Topic name for publish/subscribe messages.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topic: Option<String>,
 
+    /// Status code indicating success or error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<StatusCode>,
 
+    /// Authentication information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<Auth>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keepalive: Option<KeepAlive>,
 
     /// Client name for JOIN messages
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -293,7 +320,6 @@ impl Header {
             topic:       None,
             status:      None,
             auth:        None,
-            keepalive:   None,
             client_name: None,
             additional:  HashMap::new(),
         }
@@ -361,13 +387,6 @@ impl Header {
         self
     }
 
-    /// Add keep-alive information
-    #[must_use]
-    pub const fn with_keepalive(mut self, keepalive: KeepAlive) -> Self {
-        self.keepalive = Some(keepalive);
-        self
-    }
-
     /// Add client name for JOIN messages
     #[must_use]
     pub fn with_client_name(mut self, client_name: impl Into<String>) -> Self {
@@ -385,12 +404,17 @@ impl Default for Header {
 /// Header field enumeration for validation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeaderField {
+    /// Routing field.
     Routing,
+    /// Request/response correlation field.
     Reqrep,
+    /// Topic field.
     Topic,
+    /// Status field.
     Status,
+    /// Authentication field.
     Auth,
-    Keepalive,
+    /// Client name field.
     ClientName,
 }
 
@@ -404,7 +428,6 @@ impl HeaderField {
             Self::Topic => "topic",
             Self::Status => "status",
             Self::Auth => "auth",
-            Self::Keepalive => "keepalive",
             Self::ClientName => "client_name",
         }
     }
@@ -418,7 +441,6 @@ impl HeaderField {
             Self::Topic => header.topic.is_some(),
             Self::Status => header.status.is_some(),
             Self::Auth => header.auth.is_some(),
-            Self::Keepalive => header.keepalive.is_some(),
             Self::ClientName => header.client_name.is_some(),
         }
     }
@@ -427,11 +449,17 @@ impl HeaderField {
 /// Base message header (fixed 34 bytes)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseHeader {
+    /// Protocol version number.
     pub version:        ProtocolVersion,
+    /// Message type identifier.
     pub message_type:   MessageType,
+    /// Client identifier.
     pub client_id:      ClientId,
+    /// Reserved bytes for future use.
     pub reserved:       [u8; 16],
+    /// Length of the header in bytes.
     pub header_length:  u32,
+    /// Length of the payload in bytes.
     pub payload_length: u64,
 }
 

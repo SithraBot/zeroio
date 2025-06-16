@@ -30,6 +30,10 @@ pub struct WebSocketTransport {
     config: WebSocketConfig,
 }
 
+/// Configuration for the WebSocket transport.
+///
+/// This configuration is used to set up the WebSocket server or client,
+/// including parameters like maximum message size.
 #[derive(Debug, Clone)]
 pub struct WebSocketConfig {
     /// Maximum message size in bytes

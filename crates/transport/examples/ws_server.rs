@@ -1,3 +1,8 @@
+//! An example of a fleximq WebSocket server.
+//!
+//! This example demonstrates how to create a fleximq server that communicates
+//! over WebSocket.
+
 #![allow(clippy::nursery)]
 #![allow(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]

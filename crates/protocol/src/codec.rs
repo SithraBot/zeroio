@@ -424,7 +424,7 @@ mod tests {
         let mut encoder = MessageEncoder::new();
 
         // Create a test message
-        let raw_message = MessageBuilder::ping_message(3000).build().unwrap();
+        let raw_message = MessageBuilder::publish(3000).with_topic("hello").build().unwrap();
 
         // Encode the message
         let mut buffer = BytesMut::new();
@@ -435,7 +435,7 @@ mod tests {
 
         // Quick verification of the encoded data
         assert_eq!(buffer[0], crate::constants::PROTOCOL_VERSION);
-        assert_eq!(buffer[1], MessageType::Ping.to_u8());
+        assert_eq!(buffer[1], MessageType::Publish.to_u8());
     }
 
     #[test]

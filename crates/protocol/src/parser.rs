@@ -96,8 +96,11 @@ pub fn parse_message_bytes(input: &[u8]) -> ProtocolResult<MessageFrame> {
 /// A parsed message frame with raw header and payload bytes
 #[derive(Debug, Clone)]
 pub struct MessageFrame {
+    /// Pre-parsed base header containing fixed protocol fields.
     pub base_header:   BaseHeader,
+    /// Raw header bytes (`MessagePack` encoded).
     pub header_bytes:  Bytes,
+    /// Raw payload bytes.
     pub payload_bytes: Bytes,
 }
 
@@ -293,8 +296,7 @@ pub fn validate_message_structure(
     use crate::types::{
         HeaderField,
         MessageType::{
-            Broadcast, Join, Notification, Ping, Pong, Publish, Request, Response, Subscribe,
-            Unsubscribe,
+            Broadcast, Join, Notification, Publish, Request, Response, Subscribe, Unsubscribe,
         },
     };
 
@@ -306,58 +308,30 @@ pub fn validate_message_structure(
                 HeaderField::Routing,
                 HeaderField::Reqrep,
                 HeaderField::Topic,
-                HeaderField::Keepalive,
                 HeaderField::Status,
             ],
         ),
         Request | Response => (
             &[HeaderField::Routing, HeaderField::Reqrep],
-            &[HeaderField::Topic, HeaderField::Auth, HeaderField::Keepalive],
+            &[HeaderField::Topic, HeaderField::Auth],
         ),
         Notification => (
             &[HeaderField::Routing],
-            &[
-                HeaderField::Reqrep,
-                HeaderField::Topic,
-                HeaderField::Auth,
-                HeaderField::Keepalive,
-            ],
+            &[HeaderField::Reqrep, HeaderField::Topic, HeaderField::Auth],
         ),
         Broadcast => (
             &[],
-            &[
-                HeaderField::Routing,
-                HeaderField::Reqrep,
-                HeaderField::Topic,
-                HeaderField::Auth,
-                HeaderField::Keepalive,
-            ],
+            &[HeaderField::Routing, HeaderField::Reqrep, HeaderField::Topic, HeaderField::Auth],
         ),
         Publish => (
             &[HeaderField::Topic],
-            &[
-                HeaderField::Routing,
-                HeaderField::Reqrep,
-                HeaderField::Auth,
-                HeaderField::Keepalive,
-            ],
+            &[HeaderField::Routing, HeaderField::Reqrep, HeaderField::Auth],
         ),
         Subscribe | Unsubscribe => (
             &[HeaderField::Topic],
             &[
                 HeaderField::Routing,
                 HeaderField::Reqrep,
-                HeaderField::Status,
-                HeaderField::Auth,
-                HeaderField::Keepalive,
-            ],
-        ),
-        Ping | Pong => (
-            &[HeaderField::Keepalive],
-            &[
-                HeaderField::Routing,
-                HeaderField::Reqrep,
-                HeaderField::Topic,
                 HeaderField::Status,
                 HeaderField::Auth,
             ],
@@ -412,26 +386,6 @@ pub fn validate_message_structure(
                     return Err(ProtocolError::InvalidRouting(
                         "NOTIF messages must have at least one routing entry".to_string(),
                     ));
-                }
-            }
-        }
-        Ping | Pong => {
-            // Validate keepalive timestamp for PONG correlation
-            if message_type == Pong {
-                if let Some(keepalive) = &header.keepalive {
-                    // Basic timestamp validation (not too far in the future)
-                    #[allow(clippy::cast_possible_truncation)]
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as u64;
-
-                    let max_future = now + 60_000; // 1 minute in the future
-                    if keepalive.timestamp > max_future {
-                        return Err(ProtocolError::InvalidFormat(
-                            "PONG timestamp is too far in the future".to_string(),
-                        ));
-                    }
                 }
             }
         }

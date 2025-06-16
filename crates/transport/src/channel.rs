@@ -126,6 +126,7 @@ impl Default for ChannelTransport {
 
 impl ChannelTransport {
     #[must_use]
+    /// Creates a new `ChannelTransport` instance.
     pub const fn new() -> Self {
         Self
     }

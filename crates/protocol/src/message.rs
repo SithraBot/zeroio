@@ -5,6 +5,7 @@ use once_cell::sync::OnceCell;
 use serde::{Serialize, de::DeserializeOwned};
 use triomphe::Arc;
 
+/// `MessagePack` nil value representing an empty payload.
 pub const NIL: rmpv::Value = rmpv::Value::Nil;
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Message {
     /// Pre-parsed base header (always parsed for routing decisions)
+    /// Pre-parsed base header with fixed protocol fields.
     pub base_header: BaseHeader,
 
     /// Raw bytes containing the entire message
@@ -292,9 +294,13 @@ impl Message {
 /// providing efficient serialization and validation.
 #[derive(Debug, Clone)]
 pub struct RawMessage {
+    /// The message type identifier.
     pub message_type: MessageType,
+    /// The client identifier.
     pub client_id:    ClientId,
+    /// The message header.
     pub header:       Header,
+    /// The serialized payload data as bytes.
     pub payload_data: Bytes,
 }
 
@@ -405,8 +411,11 @@ impl RawMessage {
 /// of the message and want to parse everything upfront.
 #[derive(Debug, Clone)]
 pub struct TypedMessage<T> {
+    /// Pre-parsed base header with fixed protocol fields.
     pub base_header: BaseHeader,
+    /// Parsed header containing optional fields.
     pub header:      Header,
+    /// Parsed payload data of type `T`.
     pub payload:     T,
 }
 

@@ -4,8 +4,8 @@ use crate::{
     errors::ProtocolResult,
     message::{Message, NIL, RawMessage},
     types::{
-        Auth, ClientId, Header, KeepAlive, MessageType, RequestResponse, RequestResponseType,
-        Routing, StatusCode,
+        Auth, ClientId, Header, MessageType, RequestResponse, RequestResponseType, Routing,
+        StatusCode,
     },
 };
 
@@ -218,37 +218,6 @@ impl MessageBuilder {
         self
     }
 
-    /// Set keep-alive information
-    #[must_use]
-    pub const fn keepalive(mut self, keepalive: KeepAlive) -> Self {
-        self.header.keepalive = Some(keepalive);
-        self
-    }
-
-    /// Set keep-alive with current timestamp
-    #[must_use]
-    pub fn ping(mut self) -> Self {
-        self.header.keepalive = Some(KeepAlive::new());
-        self
-    }
-
-    /// Set keep-alive with current timestamp and interval
-    #[must_use]
-    pub fn ping_with_interval(mut self, interval_seconds: u32) -> Self {
-        self.header.keepalive = Some(KeepAlive::with_interval(interval_seconds));
-        self
-    }
-
-    /// Set keep-alive for PONG response
-    #[must_use]
-    pub const fn pong(mut self, ping_timestamp: u64) -> Self {
-        self.header.keepalive = Some(KeepAlive {
-            timestamp: ping_timestamp,
-            interval:  None,
-        });
-        self
-    }
-
     /// Build the message without payload
     ///
     /// # Errors
@@ -352,18 +321,6 @@ impl MessageBuilder {
     #[must_use]
     pub fn unsubscribe(client_id: ClientId) -> Self {
         Self::new(MessageType::Unsubscribe, client_id)
-    }
-
-    /// Create a PING message builder
-    #[must_use]
-    pub fn ping_message(client_id: ClientId) -> Self {
-        Self::new(MessageType::Ping, client_id).ping()
-    }
-
-    /// Create a PONG message builder
-    #[must_use]
-    pub fn pong_message(client_id: ClientId, ping_timestamp: u64) -> Self {
-        Self::new(MessageType::Pong, client_id).pong(ping_timestamp)
     }
 
     /// Create a forwarded response message with status and correlation ID
@@ -522,25 +479,6 @@ mod tests {
 
         assert_eq!(subscribe.message_type, MessageType::Subscribe);
         assert_eq!(subscribe.header.topic, Some("news.updates".to_string()));
-    }
-
-    #[test]
-    #[allow(clippy::similar_names)]
-    fn test_ping_pong_builder() {
-        let ping = MessageBuilder::new(MessageType::Ping, 1000).ping().build().unwrap();
-
-        assert_eq!(ping.message_type, MessageType::Ping);
-        assert!(ping.header.keepalive.is_some());
-
-        let keepalive = ping.header.keepalive.as_ref().unwrap();
-        let pong = MessageBuilder::new(MessageType::Pong, 2000)
-            .pong(keepalive.timestamp)
-            .build()
-            .unwrap();
-
-        assert_eq!(pong.message_type, MessageType::Pong);
-        let pong_keepalive = pong.header.keepalive.as_ref().unwrap();
-        assert_eq!(pong_keepalive.timestamp, keepalive.timestamp);
     }
 
     #[test]

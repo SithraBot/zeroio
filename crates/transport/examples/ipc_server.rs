@@ -1,3 +1,8 @@
+//! An example of a fleximq Inter-Process Communication (IPC) server.
+//!
+//! This example demonstrates how to create a fleximq server that communicates
+//! using IPC.
+
 #![allow(clippy::nursery)]
 #![allow(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]

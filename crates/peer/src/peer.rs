@@ -10,6 +10,10 @@ use triomphe::Arc;
 pub(crate) type SharedTransportStreams =
     Arc<DashMap<String, Framed<Box<dyn TransportStream>, MessageCodec>>>;
 
+/// Extension trait for shared transport streams.
+///
+/// This trait provides utility methods for managing a collection of
+/// framed transport streams, such as disconnecting from a specific stream.
 pub trait SharedTransportStreamsExt {
     /// Disconnects from a transport stream.
     ///
@@ -152,6 +156,11 @@ impl SharedTransportStreamsExt for SharedTransportStreams {
     }
 }
 
+/// The main fleximq Peer struct.
+///
+/// This struct provides the high-level interface for sending and receiving
+/// fleximq messages, managing connections, and handling various protocol
+/// interactions.
 pub struct Peer {
     transport_manager: TransportManager,
     transport_streams: SharedTransportStreams,

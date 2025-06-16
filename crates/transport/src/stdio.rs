@@ -26,6 +26,11 @@ pub struct StdioTransport {
     config: StdioConfig,
 }
 
+/// Configuration for the standard I/O transport.
+///
+/// This configuration is used to specify how the fleximq client or server
+/// interacts with standard input/output streams, typically by executing
+/// an external command and communicating with its stdin/stdout.
 #[derive(Debug, Clone, Default)]
 pub struct StdioConfig {
     /// Command to execute

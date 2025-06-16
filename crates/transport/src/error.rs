@@ -84,7 +84,12 @@ pub enum TransportError {
 
     /// Message too large
     #[error("Message too large: {size} bytes (max: {max} bytes)")]
-    MessageTooLarge { size: usize, max: usize },
+    MessageTooLarge {
+        /// The actual size of the message.
+        size: usize,
+        /// The maximum allowed size for the message.
+        max:  usize,
+    },
 
     /// Other error (for extensibility)
     #[error("{0}")]

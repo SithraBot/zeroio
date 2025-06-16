@@ -1,3 +1,8 @@
+//! An example of a fleximq manager client.
+//!
+//! This example demonstrates how to create a fleximq client that connects
+//! to a manager and sends messages.
+
 #![allow(clippy::nursery)]
 #![allow(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]

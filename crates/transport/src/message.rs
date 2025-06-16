@@ -14,12 +14,17 @@ use tokio_util::codec::{Framed, FramedRead, FramedWrite};
 
 use crate::{error::TransportResult, traits::TransportStream};
 
-// Helper struct to borrow a transport stream reference
+/// Helper struct to borrow a transport stream reference.
+///
+/// This struct allows temporarily borrowing a mutable reference to a
+/// `TransportStream`, facilitating operations that require stream access.
 pub struct StreamBorrow<'a, S: TransportStream> {
     stream: &'a mut S,
 }
 
 impl<'a, S: TransportStream> StreamBorrow<'a, S> {
+    /// Creates a new `StreamBorrow` instance from a mutable reference to a
+    /// `TransportStream`.
     pub fn new(stream: &'a mut S) -> Self {
         Self { stream }
     }
@@ -96,6 +101,10 @@ pub fn writer<S: TransportStream>(stream: S) -> FramedWrite<S, MessageEncoder> {
     FramedWrite::new(stream, encoder())
 }
 
+/// Creates a new `Framed` instance for the given stream, using `MessageCodec`
+/// for both encoding and decoding.
+#[must_use]
+#[inline]
 pub fn sink<S: TransportStream>(stream: S) -> Framed<S, MessageCodec> {
     Framed::new(stream, codec())
 }

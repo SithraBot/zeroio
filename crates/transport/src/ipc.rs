@@ -35,6 +35,9 @@ pub struct IpcTransport {
     config: IpcConfig,
 }
 
+/// Configuration for Inter-Process Communication (IPC) transport.
+///
+/// This configuration defines parameters for IPC, such as buffer sizes.
 #[derive(Debug, Clone)]
 pub struct IpcConfig {
     /// Buffer size for IPC communication (usize). Will be cast to u32 for some

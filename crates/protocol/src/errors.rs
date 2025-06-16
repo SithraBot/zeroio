@@ -10,7 +10,12 @@ pub type ProtocolResult<T> = Result<T, ProtocolError>;
 pub enum ProtocolError {
     /// Invalid protocol version
     #[error("Invalid protocol version: expected {expected}, got {actual}")]
-    InvalidVersion { expected: u8, actual: u8 },
+    InvalidVersion {
+        /// Expected protocol version number.
+        expected: u8,
+        /// Actual protocol version number encountered.
+        actual: u8,
+    },
 
     /// Unknown message type
     #[error("Unknown message type: {0}")]
@@ -22,11 +27,21 @@ pub enum ProtocolError {
 
     /// Message too large
     #[error("Message size {size} exceeds maximum {max}")]
-    MessageTooLarge { size: usize, max: usize },
+    MessageTooLarge {
+        /// Actual message length in bytes.
+        size: usize,
+        /// Maximum permitted message length in bytes.
+        max: usize,
+    },
 
     /// Header too large
     #[error("Header size {size} exceeds maximum {max}")]
-    HeaderTooLarge { size: usize, max: usize },
+    HeaderTooLarge {
+        /// Actual header length in bytes.
+        size: usize,
+        /// Maximum permitted header length in bytes.
+        max: usize,
+    },
 
     /// Invalid `ClientID`
     #[error("Invalid ClientID: {0}")]
@@ -35,14 +50,18 @@ pub enum ProtocolError {
     /// Required header field missing
     #[error("Required header field missing: {field} for message type {message_type:?}")]
     MissingRequiredField {
-        field:        String,
+        /// Name of the missing header field.
+        field: String,
+        /// Type of the message missing the field.
         message_type: String,
     },
 
     /// Forbidden header field present
     #[error("Forbidden header field present: {field} for message type {message_type:?}")]
     ForbiddenField {
-        field:        String,
+        /// Name of the disallowed header field.
+        field: String,
+        /// Type of the message containing the forbidden field.
         message_type: String,
     },
 
@@ -56,7 +75,12 @@ pub enum ProtocolError {
 
     /// Incomplete data
     #[error("Incomplete data: need {needed} bytes, got {available}")]
-    IncompleteData { needed: usize, available: usize },
+    IncompleteData {
+        /// Number of additional bytes required to complete parsing.
+        needed: usize,
+        /// Number of bytes provided so far.
+        available: usize,
+    },
 
     /// Parse error
     #[error("Parse error: {0}")]

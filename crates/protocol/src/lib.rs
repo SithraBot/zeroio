@@ -25,8 +25,8 @@ pub use codec::{MessageCodec, MessageDecoder, MessageEncoder};
 pub use errors::{ProtocolError, ProtocolResult};
 pub use message::{Message, RawMessage, TypedMessage};
 pub use types::{
-    Auth, ClientId, Header, HeaderField, KeepAlive, MessageType, ProtocolVersion, RequestResponse,
-    Routing, StatusCode,
+    Auth, ClientId, Header, HeaderField, MessageType, ProtocolVersion, RequestResponse, Routing,
+    StatusCode,
 };
 
 /// Protocol constants
@@ -41,14 +41,20 @@ pub mod constants {
     pub const RESERVED_SIZE: usize = 16;
 
     /// Special `ClientID` values
+    /// Unassigned `ClientID` value used before broker assignment.
     pub const CLIENT_ID_UNASSIGNED: u32 = 0;
+    /// `ClientID` reserved for the broker.
     pub const CLIENT_ID_BROKER: u32 = 1;
+    /// Minimum dynamic `ClientID` value for client allocations.
     pub const CLIENT_ID_MIN_DYNAMIC: u32 = 1000;
+    /// Maximum dynamic `ClientID` value for client allocations.
     pub const CLIENT_ID_MAX_DYNAMIC: u32 = u32::MAX - 1;
+    /// Reserved maximum `ClientID` value (sentinel).
     pub const CLIENT_ID_RESERVED_MAX: u32 = u32::MAX;
 
     /// Default limits
+    /// Default maximum message size in bytes (1GB).
     pub const DEFAULT_MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 1024; // 1GB
+    /// Default maximum header size in bytes (64KB).
     pub const DEFAULT_MAX_HEADER_SIZE: usize = 64 * 1024; // 64KB
-    pub const DEFAULT_KEEPALIVE_INTERVAL: u32 = 30; // 30 seconds
 }
