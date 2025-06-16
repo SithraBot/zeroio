@@ -286,7 +286,10 @@ impl Transport for IpcTransport {
 }
 
 impl PlatformAdapter {
-    async fn connect(path: &Path, config: &IpcConfig) -> TransportResult<PlatformStream> {
+    async fn connect(
+        path: &Path,
+        #[allow(unused_variables)] config: &IpcConfig,
+    ) -> TransportResult<PlatformStream> {
         #[cfg(unix)]
         {
             unix::connect(path).await

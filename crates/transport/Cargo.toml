@@ -5,9 +5,7 @@ version.workspace = true
 
 [dependencies]
 
-lru.workspace = true
-once_cell.workspace = true
-triomphe.workspace = true
+# Utilities
 unsize.workspace = true
 
 # Protocol
@@ -27,6 +25,9 @@ thiserror.workspace = true
 # Data structures
 bytes.workspace = true
 dashmap.workspace = true
+lru.workspace = true
+once_cell.workspace = true
+triomphe.workspace = true
 
 # URL parsing
 url.workspace = true

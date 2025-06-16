@@ -38,6 +38,14 @@ pub enum TransportError {
     #[error("Connection dropped")]
     ConnectionDropped,
 
+    /// Multiple errors occurred during transport operations
+    #[error("Multiple errors occurred")]
+    Multiple(Vec<TransportError>),
+
+    /// Connection not found (for dynamic transport loading)
+    #[error("Connection not found: {0}")]
+    ConnectionNotFound(String),
+
     /// Operation timed out
     #[error("Operation timed out after {0:?}")]
     Timeout(Duration),

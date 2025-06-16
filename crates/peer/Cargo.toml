@@ -9,6 +9,7 @@ fleximq-transport.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 log.workspace = true
+tokio-util.workspace = true
 rmpv.workspace = true
 rmp-serde.workspace = true
 serde.workspace = true
@@ -21,6 +22,8 @@ crossbeam-queue = "0.3"
 futures-util.workspace = true
 tower.workspace = true
 dashmap.workspace = true
+triomphe.workspace = true
+unsize.workspace = true
 
 [lints]
 workspace = true

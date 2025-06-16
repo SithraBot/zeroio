@@ -1,6 +1,6 @@
 //! High-performance binary parser using nom
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use nom::{
     IResult, Parser,
     bytes::complete::take,
@@ -138,7 +138,7 @@ fn parse_message_frame_nom(input: &[u8]) -> IResult<&[u8], MessageFrame> {
 #[derive(Debug, Clone)]
 pub struct MessageParser {
     /// Buffer for accumulating incoming data
-    buffer:           Vec<u8>,
+    buffer:           BytesMut,
     /// Maximum message size allowed
     max_message_size: usize,
     /// Maximum header size allowed
@@ -148,15 +148,15 @@ pub struct MessageParser {
 impl MessageParser {
     /// Create a new streaming message parser
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self::with_limits(DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_HEADER_SIZE)
     }
 
     /// Create a new parser with custom size limits
     #[must_use]
-    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
         Self {
-            buffer: Vec::new(),
+            buffer: BytesMut::new(),
             max_message_size,
             max_header_size,
         }
@@ -223,7 +223,7 @@ impl MessageParser {
         }
 
         // Extract the complete message
-        let message_bytes = self.buffer.drain(..total_size).collect::<Vec<u8>>();
+        let message_bytes = self.buffer.split_to(total_size);
         let message = crate::message::Message::from_bytes(Bytes::from(message_bytes))?;
 
         Ok(Some(message))

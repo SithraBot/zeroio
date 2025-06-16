@@ -19,8 +19,7 @@ use url::Url;
 
 use crate::{
     error::{TransportError, TransportResult},
-    message::MessageTransportAdapter,
-    traits::{ConnectionInfo, ConnectionTimeouts, MessageTransport, Transport, TransportStream},
+    traits::{ConnectionInfo, ConnectionTimeouts, Transport, TransportStream},
 };
 
 /// Global registry mapping `channel` names to waiting endpoints.
@@ -184,21 +183,15 @@ impl Transport for ChannelTransport {
     }
 }
 
-/// Helper to wrap a `ChannelStream` with the standard `MessageTransport`
-/// adapter.
-#[must_use]
-pub fn message_transport(stream: ChannelStream) -> impl MessageTransport {
-    MessageTransportAdapter::new(stream)
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
     use fleximq_protocol::{builder::MessageBuilder, types::MessageType};
+    use futures_util::{SinkExt, StreamExt};
 
     use super::*;
-    use crate::traits::MessageTransport; // bring trait methods in scope
+    use crate::message::sink; // bring trait methods in scope
 
     #[tokio::test]
     async fn test_channel_transport_pair() {
@@ -213,17 +206,17 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         let stream2 = transport.connect(url).await.unwrap();
-        let mut m2 = MessageTransportAdapter::new(stream2);
+        let mut m2 = sink(stream2);
 
         let stream1 = t1.await.unwrap();
-        let mut m1 = MessageTransportAdapter::new(stream1);
+        let mut m1 = sink(stream1);
 
         // Build simple publish message
         let raw = MessageBuilder::simple_publish(1, "test.topic").build().unwrap();
         let msg = raw.into_message().unwrap();
 
-        m1.send_message(&msg).await.unwrap();
-        let received = m2.receive_message().await.unwrap();
+        m1.send(&msg).await.unwrap();
+        let received = m2.next().await.unwrap().unwrap();
 
         assert_eq!(received.client_id(), msg.client_id());
         assert_eq!(received.message_type(), MessageType::Publish);

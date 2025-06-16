@@ -22,7 +22,7 @@ pub struct MessageCodec {
 impl MessageCodec {
     /// Create a new codec with default limits
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             parser:         MessageParser::new(),
             max_frame_size: crate::constants::DEFAULT_MAX_MESSAGE_SIZE,
@@ -31,7 +31,7 @@ impl MessageCodec {
 
     /// Create a new codec with custom limits
     #[must_use]
-    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
         Self {
             parser:         MessageParser::with_limits(max_message_size, max_header_size),
             max_frame_size: max_message_size,
@@ -75,10 +75,10 @@ impl Decoder for MessageCodec {
     }
 }
 
-impl Encoder<RawMessage> for MessageCodec {
+impl Encoder<&RawMessage> for MessageCodec {
     type Error = ProtocolError;
 
-    fn encode(&mut self, item: RawMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: &RawMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let bytes = item.to_bytes()?;
 
         // Check frame size limit
@@ -96,10 +96,10 @@ impl Encoder<RawMessage> for MessageCodec {
     }
 }
 
-impl Encoder<Message> for MessageCodec {
+impl Encoder<&Message> for MessageCodec {
     type Error = ProtocolError;
 
-    fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: &Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let bytes = item.raw_bytes();
 
         // Check frame size limit
@@ -130,7 +130,7 @@ pub struct MessageDecoder {
 impl MessageDecoder {
     /// Create a new decoder with default limits
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             parser:         MessageParser::new(),
             max_frame_size: crate::constants::DEFAULT_MAX_MESSAGE_SIZE,
@@ -139,7 +139,7 @@ impl MessageDecoder {
 
     /// Create a new decoder with custom limits
     #[must_use]
-    pub const fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
+    pub fn with_limits(max_message_size: usize, max_header_size: usize) -> Self {
         Self {
             parser:         MessageParser::with_limits(max_message_size, max_header_size),
             max_frame_size: max_message_size,
@@ -219,10 +219,10 @@ impl Default for MessageEncoder {
     }
 }
 
-impl Encoder<RawMessage> for MessageEncoder {
+impl Encoder<&RawMessage> for MessageEncoder {
     type Error = ProtocolError;
 
-    fn encode(&mut self, item: RawMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: &RawMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let bytes = item.to_bytes()?;
 
         // Check frame size limit
@@ -240,10 +240,10 @@ impl Encoder<RawMessage> for MessageEncoder {
     }
 }
 
-impl Encoder<Message> for MessageEncoder {
+impl Encoder<&Message> for MessageEncoder {
     type Error = ProtocolError;
 
-    fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: &Message, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let bytes = item.raw_bytes();
 
         // Check frame size limit
@@ -299,7 +299,7 @@ pub mod utils {
     /// encoding fails.
     pub async fn send_message<T>(
         sink: &mut Framed<T, MessageCodec>,
-        message: RawMessage,
+        message: &RawMessage,
     ) -> ProtocolResult<()>
     where
         T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -327,6 +327,51 @@ pub mod utils {
     }
 }
 
+/// Create a new message encoder
+///
+/// # Example
+///
+/// ```
+/// use fleximq_protocol::codec::encoder;
+///
+/// let encoder = encoder();
+/// ```
+#[must_use]
+#[inline]
+pub const fn encoder() -> MessageEncoder {
+    MessageEncoder::new()
+}
+
+/// Create a new message decoder
+///
+/// # Example
+///
+/// ```
+/// use fleximq_protocol::codec::decoder;
+///
+/// let decoder = decoder();
+/// ```
+#[must_use]
+#[inline]
+pub fn decoder() -> MessageDecoder {
+    MessageDecoder::new()
+}
+
+/// Create a new message codec
+///
+/// # Example
+///
+/// ```
+/// use fleximq_protocol::codec::codec;
+///
+/// let codec = codec();
+/// ```
+#[must_use]
+#[inline]
+pub fn codec() -> MessageCodec {
+    MessageCodec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
@@ -345,7 +390,7 @@ mod tests {
 
         // Encode the message
         let mut buffer = BytesMut::new();
-        codec.encode(raw_message, &mut buffer).unwrap();
+        codec.encode(&raw_message, &mut buffer).unwrap();
 
         // Decode the message
         let decoded = codec.decode(&mut buffer).unwrap().unwrap();
@@ -383,7 +428,7 @@ mod tests {
 
         // Encode the message
         let mut buffer = BytesMut::new();
-        encoder.encode(raw_message, &mut buffer).unwrap();
+        encoder.encode(&raw_message, &mut buffer).unwrap();
 
         // Verify the buffer contains data
         assert!(!buffer.is_empty());
@@ -404,8 +449,8 @@ mod tests {
         // Encode both messages
         let mut buffer1 = BytesMut::new();
         let mut buffer2 = BytesMut::new();
-        codec.encode(msg1, &mut buffer1).unwrap();
-        codec.encode(msg2, &mut buffer2).unwrap();
+        codec.encode(&msg1, &mut buffer1).unwrap();
+        codec.encode(&msg2, &mut buffer2).unwrap();
 
         // Combine into a single buffer (simulating network stream)
         let mut combined = BytesMut::new();
@@ -434,7 +479,7 @@ mod tests {
 
         // Encoding should fail due to size limit
         let mut buffer = BytesMut::new();
-        let result = codec.encode(raw_message, &mut buffer);
+        let result = codec.encode(&raw_message, &mut buffer);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),

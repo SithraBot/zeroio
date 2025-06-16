@@ -13,15 +13,12 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use fleximq_protocol::{ProtocolError, codec::MessageCodec, message::Message};
-use futures_util::{SinkExt, StreamExt};
 use log::{debug, error};
 use tokio::{
     io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     net::{TcpListener, TcpStream},
     time,
 };
-use tokio_util::codec::Framed;
 use url::Url;
 
 // Define constants locally if imports are causing issues
@@ -33,8 +30,8 @@ const DEFAULT_TCP_KEEP_ALIVE_SECS: u64 = 60;
 use crate::{
     error::{TransportError, TransportResult},
     traits::{
-        ConnectionInfo, ConnectionTimeouts, FramedTransport, MessageTransport, Transport,
-        TransportListener, TransportStream,
+        ConnectionInfo, ConnectionTimeouts, FramedTransport, Transport, TransportListener,
+        TransportStream,
     },
 };
 
@@ -144,28 +141,6 @@ impl TcpTransport {
         } else {
             Ok(stream)
         }
-    }
-
-    /// Create a high-level message-based transport from a TCP stream
-    ///
-    /// # Errors
-    ///
-    /// This function does not typically return errors itself, as it's primarily
-    /// constructing a new type. However, underlying operations within the codec
-    /// or stream could potentially lead to errors during its usage, which would
-    /// be surfaced through the `MessageTransport` trait methods.
-    pub fn create_message_transport(
-        &self,
-        stream: TcpTransportStream,
-    ) -> TransportResult<TcpMessageTransport> {
-        let codec = MessageCodec::with_limits(
-            self.config.max_message_size,
-            self.config.max_message_size / 10, // header size limit = 10% of message size
-        );
-
-        Ok(TcpMessageTransport {
-            framed: Framed::new(stream, codec),
-        })
     }
 }
 
@@ -363,100 +338,6 @@ impl TcpTransportStream {
             .map_err(|e| TransportError::Io(format!("Failed to flush TCP stream: {e}")))?;
 
         Ok(())
-    }
-}
-
-/// High-level message-based TCP transport
-///
-/// This implementation wraps a framed transport stream with `MessageCodec`
-/// to provide direct Message sending and receiving capabilities.
-pub struct TcpMessageTransport {
-    /// Framed transport using `MessageCodec`
-    framed: Framed<TcpTransportStream, MessageCodec>,
-}
-
-#[async_trait]
-impl MessageTransport for TcpMessageTransport {
-    async fn send_message(&mut self, message: &Message) -> TransportResult<()> {
-        // Apply write timeout if configured
-        let timeout = self.stream().timeouts().write_timeout;
-        if let Some(timeout_duration) = timeout {
-            match time::timeout(
-                timeout_duration,
-                SinkExt::<Message>::send(&mut self.framed, message.clone()),
-            )
-            .await
-            {
-                Ok(result) => result.map_err(|e| {
-                    TransportError::Protocol(ProtocolError::InvalidFormat(format!(
-                        "Failed to encode message: {e}"
-                    )))
-                })?,
-                Err(_) => return Err(TransportError::Timeout(timeout_duration)),
-            }
-
-            match time::timeout(
-                timeout_duration,
-                SinkExt::<Message>::flush(&mut self.framed),
-            )
-            .await
-            {
-                Ok(result) => result.map_err(|e| {
-                    TransportError::Protocol(ProtocolError::InvalidFormat(format!(
-                        "Failed to flush encoded message: {e}"
-                    )))
-                })?,
-                Err(_) => return Err(TransportError::Timeout(timeout_duration)),
-            }
-        } else {
-            SinkExt::<Message>::send(&mut self.framed, message.clone()).await.map_err(|e| {
-                TransportError::Protocol(ProtocolError::InvalidFormat(format!(
-                    "Failed to encode message: {e}"
-                )))
-            })?;
-            SinkExt::<Message>::flush(&mut self.framed).await.map_err(|e| {
-                TransportError::Protocol(ProtocolError::InvalidFormat(format!(
-                    "Failed to flush encoded message: {e}"
-                )))
-            })?;
-        }
-
-        Ok(())
-    }
-
-    async fn receive_message(&mut self) -> TransportResult<Message> {
-        // Apply read timeout if configured
-        let timeout = self.stream().timeouts().read_timeout;
-        if let Some(timeout_duration) = timeout {
-            match time::timeout(timeout_duration, StreamExt::next(&mut self.framed)).await {
-                Ok(Some(Ok(message))) => Ok(message),
-                Ok(Some(Err(e))) => Err(TransportError::Protocol(ProtocolError::InvalidFormat(
-                    format!("Protocol error: {e}"),
-                ))),
-                Ok(None) => Err(TransportError::ConnectionClosed),
-                Err(_) => Err(TransportError::Timeout(timeout_duration)),
-            }
-        } else {
-            match StreamExt::next(&mut self.framed).await {
-                Some(Ok(message)) => Ok(message),
-                Some(Err(e)) => Err(TransportError::Protocol(ProtocolError::InvalidFormat(
-                    format!("Protocol error: {e}"),
-                ))),
-                None => Err(TransportError::ConnectionClosed),
-            }
-        }
-    }
-
-    fn stream(&self) -> &dyn TransportStream {
-        self.framed.get_ref()
-    }
-
-    fn stream_mut(&mut self) -> &mut dyn TransportStream {
-        self.framed.get_mut()
-    }
-
-    async fn close(&mut self) -> TransportResult<()> {
-        self.stream_mut().close().await
     }
 }
 

@@ -5,218 +5,14 @@
 //! and high-level protocol messages.
 
 use async_trait::async_trait;
-use bytes::BytesMut;
 use fleximq_protocol::{
-    codec::{MessageDecoder, MessageEncoder},
-    errors::ProtocolError,
-    message::{Message, RawMessage},
+    MessageCodec, MessageDecoder, MessageEncoder,
+    codec::{codec, decoder, encoder},
 };
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::{Framed, FramedRead, FramedWrite};
 
-use crate::{
-    error::{TransportError, TransportResult},
-    traits::{MessageTransport, TransportStream},
-};
-
-/// A message transport implementation that wraps any transport stream
-pub struct MessageTransportAdapter<S> {
-    stream:      S,
-    decoder:     MessageDecoder,
-    encoder:     MessageEncoder,
-    read_buffer: BytesMut,
-}
-
-impl<S> MessageTransportAdapter<S>
-where
-    S: TransportStream,
-{
-    /// Create a new message transport adapter from any transport stream
-    pub fn new(stream: S) -> Self {
-        Self {
-            stream,
-            decoder: MessageDecoder::new(),
-            encoder: MessageEncoder::new(),
-            read_buffer: BytesMut::with_capacity(8192), // 8KB initial buffer
-        }
-    }
-
-    /// Create a new message transport adapter with custom buffer capacity
-    pub fn with_capacity(stream: S, capacity: usize) -> Self {
-        Self {
-            stream,
-            decoder: MessageDecoder::new(),
-            encoder: MessageEncoder::new(),
-            read_buffer: BytesMut::with_capacity(capacity),
-        }
-    }
-
-    /// Create a new message transport adapter with custom limits
-    pub fn with_limits(
-        stream: S,
-        max_message_size: usize,
-        max_header_size: usize,
-        buffer_capacity: usize,
-    ) -> Self {
-        Self {
-            stream,
-            decoder: MessageDecoder::with_limits(max_message_size, max_header_size),
-            encoder: MessageEncoder::with_max_frame_size(max_message_size),
-            read_buffer: BytesMut::with_capacity(buffer_capacity),
-        }
-    }
-
-    /// Get a reference to the underlying stream
-    pub const fn get_ref(&self) -> &S {
-        &self.stream
-    }
-
-    /// Get a mutable reference to the underlying stream
-    pub fn get_mut(&mut self) -> &mut S {
-        &mut self.stream
-    }
-
-    /// Extract the inner stream, consuming the adapter
-    pub fn into_inner(self) -> S {
-        self.stream
-    }
-}
-
-#[async_trait]
-impl<S> MessageTransport for MessageTransportAdapter<S>
-where
-    S: TransportStream,
-{
-    async fn send_message(&mut self, message: &Message) -> TransportResult<()> {
-        // Encode the message
-        let mut buffer = BytesMut::new();
-        self.encoder
-            .encode(message.clone(), &mut buffer)
-            .map_err(TransportError::Protocol)?;
-
-        // Write the buffer to the stream
-        self.stream
-            .write_all(&buffer)
-            .await
-            .map_err(|e| TransportError::Io(format!("Error writing message: {e}")))?;
-
-        // Flush to ensure it's sent
-        self.stream
-            .flush()
-            .await
-            .map_err(|e| TransportError::Io(format!("Error flushing after message write: {e}")))?;
-
-        Ok(())
-    }
-
-    async fn receive_message(&mut self) -> TransportResult<Message> {
-        // Keep reading until we can parse a complete message
-        loop {
-            // Try to decode a message from the buffer
-            match self.decoder.decode(&mut self.read_buffer) {
-                Ok(Some(message)) => return Ok(message),
-                Ok(None) => {
-                    // Need more data, continue reading
-                }
-                Err(e) => {
-                    return Err(TransportError::Protocol(e));
-                }
-            }
-
-            // Read more data into the buffer
-            let mut temp_buf = [0u8; 4096];
-            let bytes_read = self
-                .stream
-                .read(&mut temp_buf)
-                .await
-                .map_err(|e| TransportError::Io(format!("Error reading message data: {e}")))?;
-
-            if bytes_read == 0 {
-                // EOF reached with no complete message
-                return Err(TransportError::ConnectionClosed);
-            }
-
-            // Extend the buffer with the new data
-            self.read_buffer.extend_from_slice(&temp_buf[..bytes_read]);
-        }
-    }
-
-    fn stream(&self) -> &dyn TransportStream {
-        &self.stream
-    }
-
-    fn stream_mut(&mut self) -> &mut dyn TransportStream {
-        &mut self.stream
-    }
-
-    async fn close(&mut self) -> TransportResult<()> {
-        self.stream.close().await
-    }
-}
-
-/// Extension trait to add message reading/writing to any `TransportStream`
-#[async_trait]
-pub trait MessageStreamExt: TransportStream {
-    /// Read a protocol message from the stream
-    async fn read_message(&mut self) -> TransportResult<Message>;
-
-    /// Write a protocol message to the stream
-    async fn write_message(&mut self, message: &RawMessage) -> TransportResult<()>;
-}
-
-// Implement for all transport streams
-#[async_trait]
-impl<T: TransportStream> MessageStreamExt for T {
-    async fn read_message(&mut self) -> TransportResult<Message> {
-        // Use direct decoding instead of the adapter
-        let mut decoder = MessageDecoder::new();
-        let mut buffer = BytesMut::with_capacity(8192);
-
-        loop {
-            // Try to decode a message from the buffer
-            if let Some(message) = decoder.decode(&mut buffer)? {
-                return Ok(message);
-            }
-
-            // Read more data into the buffer
-            let mut temp_buf = [0u8; 4096];
-            let bytes_read = self
-                .read(&mut temp_buf)
-                .await
-                .map_err(|e| TransportError::Io(format!("Error reading message data: {e}")))?;
-
-            if bytes_read == 0 {
-                // EOF reached with no complete message
-                return Err(TransportError::ConnectionClosed);
-            }
-
-            // Extend the buffer with the new data
-            buffer.extend_from_slice(&temp_buf[..bytes_read]);
-        }
-    }
-
-    async fn write_message(&mut self, message: &RawMessage) -> TransportResult<()> {
-        // Use direct encoding instead of the adapter
-        // let mut encoder = MessageEncoder::new();
-        // let mut buffer = BytesMut::new();
-
-        // Encode the message
-        // encoder.encode(message.clone(), &mut
-        // buffer).map_err(TransportError::Protocol)?;
-
-        // Write the buffer to the stream
-        self.write_all(&message.to_bytes()?)
-            .await
-            .map_err(|e| TransportError::Io(format!("Error writing message: {e}")))?;
-
-        // Flush to ensure it's sent
-        self.flush()
-            .await
-            .map_err(|e| TransportError::Io(format!("Error flushing after message write: {e}")))?;
-
-        Ok(())
-    }
-}
+use crate::{error::TransportResult, traits::TransportStream};
 
 // Helper struct to borrow a transport stream reference
 pub struct StreamBorrow<'a, S: TransportStream> {
@@ -286,23 +82,31 @@ impl<S: TransportStream> AsyncWrite for StreamBorrow<'_, S> {
     }
 }
 
-/// Creates a `MessageTransportAdapter` from any `TransportStream`
-pub fn message_transport<S: TransportStream>(stream: S) -> MessageTransportAdapter<S> {
-    MessageTransportAdapter::new(stream)
+/// Creates a new message reader for the given stream.
+#[must_use]
+#[inline]
+pub fn reader<S: TransportStream>(stream: S) -> FramedRead<S, MessageDecoder> {
+    FramedRead::new(stream, decoder())
 }
 
-/// Utility function to convert a protocol error to a transport error
+/// Creates a new message writer for the given stream.
 #[must_use]
-pub const fn protocol_error_to_transport(err: ProtocolError) -> TransportError {
-    TransportError::Protocol(err)
+#[inline]
+pub fn writer<S: TransportStream>(stream: S) -> FramedWrite<S, MessageEncoder> {
+    FramedWrite::new(stream, encoder())
+}
+
+pub fn sink<S: TransportStream>(stream: S) -> Framed<S, MessageCodec> {
+    Framed::new(stream, codec())
 }
 
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, time::Instant};
 
-    use fleximq_protocol::{builder::MessageBuilder, types::MessageType};
-    use tokio::io::{AsyncReadExt, duplex};
+    use bytes::BytesMut;
+    use fleximq_protocol::{MessageDecoder, builder::MessageBuilder, types::MessageType};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
     use tokio_util::codec::Decoder;
 
     use super::*;
@@ -407,10 +211,14 @@ mod tests {
         let (mut client, mut server) = MockTransportStream::new();
 
         // Create a test message
-        let raw_message = MessageBuilder::simple_publish(1000, "test.topic").build().unwrap();
+        let raw_message = MessageBuilder::simple_publish(1000, "test.topic")
+            .build()
+            .unwrap()
+            .to_bytes()
+            .unwrap();
 
         // Write the message using the extension method
-        client.write_message(&raw_message).await.unwrap();
+        client.write_all(&raw_message).await.unwrap();
 
         // Read the message from the server
         let mut buffer = BytesMut::with_capacity(1024);

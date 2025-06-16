@@ -158,7 +158,7 @@ impl TransportManager {
     /// Returns `TransportError` if:
     /// - No transport supports the given URL
     /// - The connection fails
-    pub async fn connect(&self, url: &str) -> TransportResult<Box<dyn TransportStream>> {
+    pub async fn connect(&self, url: &str) -> TransportResult<impl TransportStream + 'static> {
         // Update connection statistics
         self.track_connection_attempt(url);
 

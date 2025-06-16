@@ -24,12 +24,8 @@ pub use channel::ChannelTransport;
 pub use error::{TransportError, TransportResult};
 pub use ipc::{IpcConfig, IpcTransport};
 pub use manager::{CacheStats, TransportManager};
-pub use message::{MessageStreamExt, MessageTransportAdapter, message_transport};
 pub use stdio::StdioTransport;
 // Re-export transport implementations
 pub use tcp::{TcpConfig, TcpTransport};
-pub use traits::{
-    ConnectionInfo, FramedTransport, MessageTransport, Transport, TransportFactory,
-    TransportListener, TransportStream,
-};
+pub use traits::{ConnectionInfo, FramedTransport, Transport, TransportListener, TransportStream};
 pub use websocket::{WebSocketConfig, WebSocketTransport};

@@ -2,8 +2,10 @@
 #![allow(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
-use fleximq_transport::{MessageStreamExt, TransportResult, manager::TransportManager};
-use futures_util::future::select_ok;
+use fleximq_protocol::MessageDecoder;
+use fleximq_transport::{TransportResult, TransportStream, manager::TransportManager};
+use futures_util::{StreamExt, future::select_ok};
+use tokio_util::codec::FramedRead;
 #[tokio::main]
 async fn main() -> TransportResult<()> {
     let manager = TransportManager::new();
@@ -12,13 +14,15 @@ async fn main() -> TransportResult<()> {
         Box::pin(manager.connect("tcp://127.0.0.1:2121")),
         Box::pin(manager.connect("ws://127.0.0.1:1212")),
     ];
-    let mut stream = if let Ok((stream, _)) = select_ok(connect_try).await {
+    let stream = if let Ok((stream, _)) = select_ok(connect_try).await {
         stream
     } else {
         manager.connect("stdio://").await?
     };
-    let message = stream.read_message().await?;
+    let decoder = MessageDecoder::new();
+    let mut reader = FramedRead::new(stream, decoder);
+    let message = reader.next().await.unwrap()?;
     eprintln!("message: {message:?}");
-    stream.close().await?;
+    reader.into_inner().close().await?;
     Ok(())
 }

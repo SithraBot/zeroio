@@ -25,7 +25,7 @@ impl PlatformListener {
         // We attempt to remove the socket file as a best effort.
         if path.exists() {
             if let Err(e) = std::fs::remove_file(path) {
-                eprintln!(
+                log::error!(
                     "Failed to remove IPC socket file '{}': {}",
                     path.display(),
                     e

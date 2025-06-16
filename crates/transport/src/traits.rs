@@ -9,9 +9,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use fleximq_protocol::message::Message;
 use tokio::io::{AsyncRead, AsyncWrite};
-use triomphe::Arc;
 
 use crate::error::TransportResult;
 
@@ -118,48 +116,6 @@ pub trait FramedTransport: TransportStream {
 
     /// Write a complete binary frame
     async fn write_frame(&mut self, data: Bytes) -> TransportResult<()>;
-}
-
-/// Higher-level message-based transport that directly works with protocol
-/// Messages
-#[async_trait]
-pub trait MessageTransport: Send + Sync {
-    /// Send a protocol message
-    async fn send_message(&mut self, message: &Message) -> TransportResult<()>;
-
-    /// Receive a protocol message
-    async fn receive_message(&mut self) -> TransportResult<Message>;
-
-    /// Get the underlying transport stream
-    fn stream(&self) -> &dyn TransportStream;
-
-    /// Get a mutable reference to the underlying transport stream
-    fn stream_mut(&mut self) -> &mut dyn TransportStream;
-
-    /// Close the transport
-    async fn close(&mut self) -> TransportResult<()>;
-}
-
-/// Transport factory for creating transport instances
-#[async_trait]
-pub trait TransportFactory: Send + Sync {
-    /// Create a transport instance from a URL
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the URL is invalid, the transport scheme is
-    /// unsupported, or if there's an issue initializing the transport
-    /// (e.g., network errors for TCP).
-    fn create_transport(
-        &self,
-        url: &str,
-    ) -> TransportResult<Arc<dyn Transport<Stream = Box<dyn TransportStream>>>>;
-
-    /// Create a message transport instance from a URL
-    async fn create_message_transport(
-        &self,
-        url: &str,
-    ) -> TransportResult<Box<dyn MessageTransport>>;
 }
 
 // Implement TransportStream for Box<dyn TransportStream> to enable type erasure
