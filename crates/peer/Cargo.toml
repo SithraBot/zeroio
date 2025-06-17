@@ -27,3 +27,6 @@ unsize.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+env_logger = "0.11"

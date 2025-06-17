@@ -184,6 +184,24 @@ pub struct RequestResponse {
     pub id:       String,
 }
 
+impl RequestResponse {
+    #[must_use]
+    pub fn req(id: impl Into<String>) -> Self {
+        Self {
+            req_type: RequestResponseType::Request,
+            id: id.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn res(id: impl Into<String>) -> Self {
+        Self {
+            req_type: RequestResponseType::Correlation,
+            id: id.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 /// Represents the type of request-response pattern.

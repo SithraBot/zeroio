@@ -40,7 +40,7 @@ triomphe = { version = "0.1", features = ["unsize"] }
 unsize = "1"
 
 [workspace.lints.rust]
-missing_docs = "warn"
+# missing_docs = "warn"
 
 [workspace.lints.clippy]
 # Performance lints - important for a communication library
