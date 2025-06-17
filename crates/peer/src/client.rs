@@ -1,5 +1,5 @@
 use fleximq_protocol::{Message, RawMessage};
-use fleximq_transport::{TransportResult};
+use fleximq_transport::TransportResult;
 
 use crate::types::{SharedTransportStream, SharedTransportStreamsExt};
 

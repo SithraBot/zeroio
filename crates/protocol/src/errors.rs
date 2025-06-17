@@ -14,7 +14,7 @@ pub enum ProtocolError {
         /// Expected protocol version number.
         expected: u8,
         /// Actual protocol version number encountered.
-        actual: u8,
+        actual:   u8,
     },
 
     /// Unknown message type
@@ -31,7 +31,7 @@ pub enum ProtocolError {
         /// Actual message length in bytes.
         size: usize,
         /// Maximum permitted message length in bytes.
-        max: usize,
+        max:  usize,
     },
 
     /// Header too large
@@ -40,7 +40,7 @@ pub enum ProtocolError {
         /// Actual header length in bytes.
         size: usize,
         /// Maximum permitted header length in bytes.
-        max: usize,
+        max:  usize,
     },
 
     /// Invalid `ClientID`
@@ -51,7 +51,7 @@ pub enum ProtocolError {
     #[error("Required header field missing: {field} for message type {message_type:?}")]
     MissingRequiredField {
         /// Name of the missing header field.
-        field: String,
+        field:        String,
         /// Type of the message missing the field.
         message_type: String,
     },
@@ -60,7 +60,7 @@ pub enum ProtocolError {
     #[error("Forbidden header field present: {field} for message type {message_type:?}")]
     ForbiddenField {
         /// Name of the disallowed header field.
-        field: String,
+        field:        String,
         /// Type of the message containing the forbidden field.
         message_type: String,
     },
@@ -77,7 +77,7 @@ pub enum ProtocolError {
     #[error("Incomplete data: need {needed} bytes, got {available}")]
     IncompleteData {
         /// Number of additional bytes required to complete parsing.
-        needed: usize,
+        needed:    usize,
         /// Number of bytes provided so far.
         available: usize,
     },

@@ -189,7 +189,7 @@ impl RequestResponse {
     pub fn req(id: impl Into<String>) -> Self {
         Self {
             req_type: RequestResponseType::Request,
-            id: id.into(),
+            id:       id.into(),
         }
     }
 
@@ -197,7 +197,7 @@ impl RequestResponse {
     pub fn res(id: impl Into<String>) -> Self {
         Self {
             req_type: RequestResponseType::Correlation,
-            id: id.into(),
+            id:       id.into(),
         }
     }
 }

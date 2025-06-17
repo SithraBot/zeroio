@@ -23,7 +23,7 @@ use crate::{
 /// interactions.
 pub struct Peer {
     transport_stream: SharedTransportStream,
-    self_id:          u32,
+    pub self_id:      u32,
 }
 
 impl Peer {
@@ -32,7 +32,11 @@ impl Peer {
     /// # Errors
     ///
     /// Returns an error if the connection fails.
-    #[must_use]
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global ULID generator is not initialized.
+    #[allow(clippy::expect_used)]
     pub async fn from_stream(
         stream: impl TransportStream + 'static,
         name: impl Into<String>,
@@ -73,7 +77,12 @@ impl Peer {
         }
     }
 
-    #[must_use]
+    /// Create a peer and connect to a broker
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the connection to the broker
+    /// fails.
     pub async fn connect(
         address: impl AsRef<str>,
         name: impl Into<String>,
